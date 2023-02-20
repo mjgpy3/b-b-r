@@ -2,12 +2,12 @@ module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
-import Maybe exposing (Maybe)
-import String exposing (String)
-import Html exposing (Html, button, div, h1, text, textarea, input)
+import Html exposing (Html, button, div, h1, input, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
+import Maybe exposing (Maybe)
+import String exposing (String)
 
 
 main =
@@ -23,10 +23,13 @@ type DefinitionValidity
 type Value
     = WholeNumber Int
 
+
 valueToString : Value -> String
 valueToString v =
     case v of
-      WholeNumber n -> String.fromInt n
+        WholeNumber n ->
+            String.fromInt n
+
 
 type alias TrackingState =
     Dict String Value
@@ -45,8 +48,10 @@ init : Model
 init =
     DefinitionStage "" StartingOut
 
+
 type TrackMsg
     = ApplyEffects (List Effect)
+
 
 type Msg
     = UpdateDefinition String
@@ -68,8 +73,29 @@ update msg model =
         CreateTracker def ->
             TrackerStage def Dict.empty
 
-        TrackerMsg schema state tmsg ->
-            model
+        TrackerMsg schema state (ApplyEffects effects) ->
+            case List.foldl applyEffect ( schema, state ) effects of
+                ( sc, st ) ->
+                    TrackerStage sc st
+
+
+applyEffect : Effect -> ( TrackerTopLevelSchema, TrackingState ) -> ( TrackerTopLevelSchema, TrackingState )
+applyEffect eff ( schema, state ) =
+    case eff of
+        RestoreDefaults { items } ->
+            ( schema, List.foldl (restoreDefault schema) state items )
+
+
+restoreDefault : TrackerTopLevelSchema -> EffectTarget -> TrackingState -> TrackingState
+restoreDefault schema target state =
+    case target of
+        ById targetId ->
+            case idDefault targetId schema.tracker of
+                Just default ->
+                    Dict.insert targetId default state
+
+                Nothing ->
+                    state
 
 
 view : Model -> Html Msg
@@ -79,13 +105,14 @@ view model =
             viewEditTracker def valid
 
         TrackerStage def state ->
-          viewTracker def state
+            viewTracker def state
+
 
 viewEditTracker : String -> DefinitionValidity -> Html Msg
 viewEditTracker def valid =
     div []
         [ div [] [ h1 [] [ text "New Tracker" ] ]
-        , div [] [ button [onClick (UpdateDefinition exampleDef) ] [text "(fill test)"] ]
+        , div [] [ button [ onClick (UpdateDefinition exampleDef) ] [ text "(fill test)" ] ]
         , div [] [ textarea [ cols 40, rows 10, placeholder "...", onInput UpdateDefinition ] [] ]
         , case valid of
             ValidDefinition d ->
@@ -105,18 +132,23 @@ viewEditTracker def valid =
 viewTrackerComponent : TrackerSchema -> TrackingState -> Html TrackMsg
 viewTrackerComponent tracker state =
     case tracker of
-      WholeNumberSchema s ->
-        div [] [text s.text, input [type_ "number", value (valueToString <| Maybe.withDefault s.default (Dict.get s.id state) )] []]
-      Group s ->
-        div [] (List.map (\i -> viewTrackerComponent i state) s.items)
-      Action s ->
-        button [onClick (ApplyEffects s.effects) ] [text s.text]
+        WholeNumberSchema s ->
+            div [] [ text s.text, input [ type_ "number", value (valueToString <| Maybe.withDefault s.default (Dict.get s.id state)) ] [] ]
+
+        Group s ->
+            div [] (List.map (\i -> viewTrackerComponent i state) s.items)
+
+        Action s ->
+            button [ onClick (ApplyEffects s.effects) ] [ text s.text ]
+
 
 viewTracker : TrackerTopLevelSchema -> TrackingState -> Html Msg
 viewTracker schema state =
-            div []
-                [ h1 [] [ text schema.name ]
-                , Html.map (TrackerMsg schema state) <| viewTrackerComponent schema.tracker state]
+    div []
+        [ h1 [] [ text schema.name ]
+        , Html.map (TrackerMsg schema state) <| viewTrackerComponent schema.tracker state
+        ]
+
 
 
 -- Tracker Schema
@@ -173,6 +205,23 @@ type TrackerSchema
     | WholeNumberSchema { text : String, default : Value, id : String }
 
 
+idDefault : String -> TrackerSchema -> Maybe Value
+idDefault id schema =
+    case schema of
+        WholeNumberSchema s ->
+            if s.id == id then
+                Just s.default
+
+            else
+                Nothing
+
+        Group s ->
+            List.head <| List.filterMap (idDefault id) s.items
+
+        Action s ->
+            Nothing
+
+
 trackerTopLevelSchemaDecoder : Decoder TrackerTopLevelSchema
 trackerTopLevelSchemaDecoder =
     Decode.map2 TrackerTopLevelSchema (field "name" string) (field "tracker" trackerSchemaDecoder)
@@ -183,8 +232,10 @@ type alias TrackerTopLevelSchema =
     , tracker : TrackerSchema
     }
 
+
 exampleDef : String
-exampleDef = """
+exampleDef =
+    """
 {
   "name": "Dominion Turn Tracker",
   "tracker": {
