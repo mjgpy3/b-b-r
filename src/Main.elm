@@ -35,9 +35,13 @@ type alias TrackingState =
     Dict String Value
 
 
+type Error
+    = ComponentIdNotFound String
+
+
 type Stage
     = DefinitionStage String DefinitionValidity
-    | TrackerStage TrackerTopLevelSchema TrackingState
+    | TrackerStage TrackerTopLevelSchema TrackingState (Maybe Error)
 
 
 type alias Model =
@@ -71,31 +75,44 @@ update msg model =
                     DefinitionStage def <| ValidDefinition d
 
         CreateTracker def ->
-            TrackerStage def Dict.empty
+            TrackerStage def Dict.empty Nothing
 
         TrackerMsg schema state (ApplyEffects effects) ->
-            case List.foldl applyEffect ( schema, state ) effects of
-                ( sc, st ) ->
-                    TrackerStage sc st
+            case List.foldl applyEffect (Ok ( schema, state )) effects of
+                Ok ( sc, st ) ->
+                    TrackerStage sc st Nothing
+
+                Err e ->
+                    TrackerStage schema state (Just e)
 
 
-applyEffect : Effect -> ( TrackerTopLevelSchema, TrackingState ) -> ( TrackerTopLevelSchema, TrackingState )
-applyEffect eff ( schema, state ) =
-    case eff of
-        RestoreDefaults { items } ->
-            ( schema, List.foldl (restoreDefault schema) state items )
+applyEffect : Effect -> Result Error ( TrackerTopLevelSchema, TrackingState ) -> Result Error ( TrackerTopLevelSchema, TrackingState )
+applyEffect eff result =
+    case result of
+        Err e ->
+            Err e
+
+        Ok ( schema, state ) ->
+            case eff of
+                RestoreDefaults { items } ->
+                    Result.map (\v -> ( schema, v )) (List.foldl (restoreDefault schema) (Ok state) items)
 
 
-restoreDefault : TrackerTopLevelSchema -> EffectTarget -> TrackingState -> TrackingState
-restoreDefault schema target state =
-    case target of
-        ById targetId ->
-            case idDefault targetId schema.tracker of
-                Just default ->
-                    Dict.insert targetId default state
+restoreDefault : TrackerTopLevelSchema -> EffectTarget -> Result Error TrackingState -> Result Error TrackingState
+restoreDefault schema target result =
+    case result of
+        Err e ->
+            Err e
 
-                Nothing ->
-                    state
+        Ok state ->
+            case target of
+                ById targetId ->
+                    case idDefault targetId schema.tracker of
+                        Just default ->
+                            Ok <| Dict.insert targetId default state
+
+                        Nothing ->
+                            Err <| ComponentIdNotFound targetId
 
 
 view : Model -> Html Msg
@@ -104,8 +121,8 @@ view model =
         DefinitionStage def valid ->
             viewEditTracker def valid
 
-        TrackerStage def state ->
-            viewTracker def state
+        TrackerStage def state err ->
+            viewTracker def state err
 
 
 viewEditTracker : String -> DefinitionValidity -> Html Msg
@@ -142,12 +159,17 @@ viewTrackerComponent tracker state =
             button [ onClick (ApplyEffects s.effects) ] [ text s.text ]
 
 
-viewTracker : TrackerTopLevelSchema -> TrackingState -> Html Msg
-viewTracker schema state =
-    div []
-        [ h1 [] [ text schema.name ]
-        , Html.map (TrackerMsg schema state) <| viewTrackerComponent schema.tracker state
-        ]
+viewTracker : TrackerTopLevelSchema -> TrackingState -> Maybe Error -> Html Msg
+viewTracker schema state err =
+    case err of
+        Just (ComponentIdNotFound id) ->
+            text <| "Component ID could not be found: " ++ id
+
+        Nothing ->
+            div []
+                [ h1 [] [ text schema.name ]
+                , Html.map (TrackerMsg schema state) <| viewTrackerComponent schema.tracker state
+                ]
 
 
 
