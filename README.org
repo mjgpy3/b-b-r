@@ -1,0 +1,60 @@
+#+title: b-b-r
+
+"Easily configurable" game tally generator.
+
+* Milestone [0/4]
+** TODO Singular dominion turn tracker
+   
+#+begin_src json
+{
+  "name": "Dominion Turn Tracker",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "action",
+        "text": "Reset",
+        "effects": [
+          {
+            "type": "restore-defaults",
+            "items": [
+              {
+                "id": "a"
+              },
+              {
+                "id": "b"
+              },
+              {
+                "id": "em"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "number",
+        "text": "Actions",
+        "default": 1,
+        "id": "a"
+      },
+      {
+        "type": "number",
+        "text": "Buys",
+        "default": 1,
+        "id": "b"
+      },
+      {
+        "type": "number",
+        "text": "Extra Money",
+        "default": 0,
+        "id": "em"
+      }
+    ]
+  }
+}
+#+end_src
+ 
+   
+** TODO Multi-player dominion turn tracke
+** TODO Simple kill team game tracker
+** TODO Kill team game tracker enhancements
