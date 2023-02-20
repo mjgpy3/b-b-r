@@ -60,6 +60,7 @@ type TrackMsg
 type Msg
     = UpdateDefinition String
     | CreateTracker TrackerTopLevelSchema
+    | TestTracker String
     | TrackerMsg TrackerTopLevelSchema TrackingState TrackMsg
 
 
@@ -73,6 +74,14 @@ update msg model =
 
                 Ok d ->
                     DefinitionStage def <| ValidDefinition d
+
+        TestTracker def ->
+            case Decode.decodeString trackerTopLevelSchemaDecoder def of
+                Err e ->
+                    DefinitionStage def <| InvalidDefinition e
+
+                Ok d ->
+                    TrackerStage d Dict.empty Nothing
 
         CreateTracker def ->
             TrackerStage def Dict.empty Nothing
@@ -129,7 +138,6 @@ viewEditTracker : String -> DefinitionValidity -> Html Msg
 viewEditTracker def valid =
     div []
         [ div [] [ h1 [] [ text "New Tracker" ] ]
-        , div [] [ button [ onClick (UpdateDefinition exampleDef) ] [ text "(fill test)" ] ]
         , div [] [ textarea [ cols 40, rows 10, placeholder "...", onInput UpdateDefinition ] [] ]
         , case valid of
             ValidDefinition d ->
@@ -143,6 +151,8 @@ viewEditTracker def valid =
 
             StartingOut ->
                 text ""
+        , div [] [ h1 [] [ text "Test Tracker" ] ]
+        , div [] [ button [ onClick (TestTracker simpleDominionTracker) ] [ text "Dominion turn tracker" ] ]
         ]
 
 
@@ -255,8 +265,8 @@ type alias TrackerTopLevelSchema =
     }
 
 
-exampleDef : String
-exampleDef =
+simpleDominionTracker : String
+simpleDominionTracker =
     """
 {
   "name": "Dominion Turn Tracker",
