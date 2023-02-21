@@ -558,11 +558,13 @@ killTeamTracker =
         "text": "Next Turning Point",
         "effects": [
           {
-            "type": "increment",
+            "type": "adjust",
+            "amount": 1,
             "targetId": "turning-point"
           },
           {
-            "type": "increment",
+            "type": "adjust",
+            "amount": 1,
             "targetId": "command-points",
             "scope": "all-players"
           }
@@ -572,6 +574,7 @@ killTeamTracker =
         "type": "number",
         "text": "Turning Point",
         "default": 1,
+        "disabled": true,
         "id": "turning-point"
       },
       {
@@ -581,25 +584,42 @@ killTeamTracker =
         "items": [
           {
             "type": "number",
-            "text": "Actions",
-            "default": 1,
-            "id": "a"
+            "text": "Command Points",
+            "default": 2,
+            "id": "command-points"
           },
           {
             "type": "number",
-            "text": "Buys",
-            "default": 1,
-            "id": "b"
-          },
-          {
-            "type": "number",
-            "text": "Extra Money",
+            "text": "Primary VP",
             "default": 0,
-            "id": "em"
+            "id": "primary-vp"
+          },
+          {
+            "type": "number",
+            "text": "Secondary VP",
+            "default": 0,
+            "id": "secondary-vp"
+          },
+          {
+            "type": "calculated",
+            "text": "Total VP",
+            "equals": {
+              "type": "add",
+              "op1": {
+                "type": "ref",
+                "targetId": "primary-vp",
+                "scope": "current-player"
+              },
+              "op2": {
+                "type": "ref",
+                "targetId": "secondary-vp",
+                "scope": "current-player"
+              }
+            }
           }
         ]
       }
     ]
   }
 }
-              """
+"""
