@@ -61,6 +61,7 @@ type Error
     | CouldNotReadNumberOfPlayers
     | CouldNotParseWholeNumber String
     | TooManyPlayerGroupsDefined
+    | CannotSetCurrentPlayerToThisWithEffectsOutsideContext
 
 
 type StageState
@@ -86,7 +87,7 @@ init =
 
 
 type TrackMsg
-    = ApplyEffects (List Effect)
+    = ApplyEffects (Maybe Int) (List Effect)
     | SetWholeNumber String (Maybe Int) String
 
 
@@ -145,8 +146,8 @@ update msg model =
         CreateTracker def turns ->
             TrackerStage def Dict.empty turns |> toState
 
-        TrackerMsg schema state turns (ApplyEffects effects) ->
-            case List.foldl applyEffect (Ok ( schema, state, turns )) effects of
+        TrackerMsg schema state turns (ApplyEffects thisPlayer effects) ->
+            case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
                 Ok ( sc, st, ts ) ->
                     TrackerStage sc st ts |> toState
 
@@ -154,7 +155,7 @@ update msg model =
                     BigError e |> toState
 
         TrackerMsg _ _ _ (SetWholeNumber _ _ "") ->
-          model
+            model
 
         TrackerMsg schema state turns (SetWholeNumber id player rawValue) ->
             case String.toInt rawValue of
@@ -185,8 +186,8 @@ update msg model =
                     BigError CouldNotReadNumberOfPlayers |> toState
 
 
-applyEffect : Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
-applyEffect eff result =
+applyEffect : Maybe Int -> Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
+applyEffect thisPlayer eff result =
     case result of
         Err e ->
             Err e
@@ -195,6 +196,14 @@ applyEffect eff result =
             case eff of
                 NextTurn ->
                     Ok ( schema, state, { turns | currentPlayerTurn = modBy turns.playerCount (turns.currentPlayerTurn + 1) } )
+
+                SetCurrentPlayer CurrentIsThisPlayer ->
+                    case thisPlayer of
+                        Just player ->
+                            Ok ( schema, state, { turns | currentPlayerTurn = player } )
+
+                        Nothing ->
+                            Err CannotSetCurrentPlayerToThisWithEffectsOutsideContext
 
                 OnCells op targetId scope ->
                     let
@@ -272,6 +281,9 @@ view model =
 
                     TooManyPlayerGroupsDefined ->
                         text "Too many player-groups are defined! Only one is allowed."
+
+                    CannotSetCurrentPlayerToThisWithEffectsOutsideContext ->
+                        text "To set this-player as the current player the effects must originate from the context of a player"
                 , button [ onClick MoveToEdit ] [ text "Return to edit" ]
                 ]
 
@@ -311,30 +323,51 @@ viewEditTracker def valid =
         , div [] [ button [ onClick (TestTracker killTeamTracker { currentPlayerTurn = 0, playerCount = 2 }) ] [ text "Kill team" ] ]
         ]
 
+
 eval : TrackerTopLevelSchema -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
 eval schema expr thisPlayer state currentPlayer =
     let
         aux e =
             case e of
-              Add op1 op2 -> case (aux op1, aux op2) of
-                                (Ok (WholeNumber a), Ok (WholeNumber b)) -> Ok (WholeNumber (a+b))
-                                (Err err, _) -> Err err
-                                (_, Err err) -> Err err
-              Ref targetId scope ->
-                let
-                    player = case (scope, thisPlayer) of
-                                    ( NonPlayer , _) -> Ok Nothing
-                                    ( CurrentPlayer , _) -> Ok (Just currentPlayer)
-                                    ( AllPlayers , _) -> Err "Calculated fields cannot reference all players"
-                                    ( ThisPlayer, Just this) -> Ok (Just this)
-                                    ( ThisPlayer, Nothing) -> Err "Referenced this player, but couldn't find them"
+                Add op1 op2 ->
+                    case ( aux op1, aux op2 ) of
+                        ( Ok (WholeNumber a), Ok (WholeNumber b) ) ->
+                            Ok (WholeNumber (a + b))
 
-                in
+                        ( Err err, _ ) ->
+                            Err err
+
+                        ( _, Err err ) ->
+                            Err err
+
+                Ref targetId scope ->
+                    let
+                        player =
+                            case ( scope, thisPlayer ) of
+                                ( NonPlayer, _ ) ->
+                                    Ok Nothing
+
+                                ( CurrentPlayer, _ ) ->
+                                    Ok (Just currentPlayer)
+
+                                ( AllPlayers, _ ) ->
+                                    Err "Calculated fields cannot reference all players"
+
+                                ( ThisPlayer, Just this ) ->
+                                    Ok (Just this)
+
+                                ( ThisPlayer, Nothing ) ->
+                                    Err "Referenced this player, but couldn't find them"
+                    in
                     case idDefault targetId schema.tracker of
-                        Just default -> player |> Result.map (\p -> Maybe.withDefault default (Dict.get (key targetId p) state))
-                        Nothing -> Err ( "Could not find identifier " ++ targetId ++ " anywhere")
+                        Just default ->
+                            player |> Result.map (\p -> Maybe.withDefault default (Dict.get (key targetId p) state))
+
+                        Nothing ->
+                            Err ("Could not find identifier " ++ targetId ++ " anywhere")
     in
-      aux expr
+    aux expr
+
 
 viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> Html TrackMsg
 viewTrackerComponent schema tracker state turns playerNumber =
@@ -355,8 +388,11 @@ viewTrackerComponent schema tracker state turns playerNumber =
                 [ text s.text
                 , text " "
                 , case eval schema s.equals playerNumber state turns.currentPlayerTurn of
-                      Ok (WholeNumber v) -> v |> String.fromInt |> text
-                      Err e -> text ("Error: " ++ e)
+                    Ok (WholeNumber v) ->
+                        v |> String.fromInt |> text
+
+                    Err e ->
+                        text ("Error: " ++ e)
                 ]
 
         Group s ->
@@ -366,7 +402,7 @@ viewTrackerComponent schema tracker state turns playerNumber =
             List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) ]) |> div []
 
         Action s ->
-            button [ onClick (ApplyEffects s.effects) ] [ text s.text ]
+            button [ onClick (ApplyEffects playerNumber s.effects) ] [ text s.text ]
 
 
 viewPlayerIndicator : Turns -> Int -> Html TrackMsg
@@ -409,11 +445,29 @@ cellScopeDecoder scope =
             Decode.fail (s ++ " is not a valid effect scope")
 
 
+specificNewCurrentPlayerDecoder : String -> Decoder NewCurrentPlayer
+specificNewCurrentPlayerDecoder newCp =
+    case newCp of
+        "this-player" ->
+            Decode.succeed CurrentIsThisPlayer
+
+        _ ->
+            Decode.fail (newCp ++ " is not a valid new current player")
+
+
+decodeNewCurrentPlayer : Decoder NewCurrentPlayer
+decodeNewCurrentPlayer =
+    string |> Decode.andThen specificNewCurrentPlayerDecoder
+
+
 specificEffectDecoder : String -> Decoder Effect
 specificEffectDecoder ty =
     case ty of
         "next-turn" ->
             Decode.succeed NextTurn
+
+        "set-current-player" ->
+            Decode.map SetCurrentPlayer (field "target" decodeNewCurrentPlayer)
 
         "restore-default" ->
             Decode.map2 (OnCells RestoreDefault) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
@@ -441,9 +495,15 @@ type CellScope
     | AllPlayers
     | ThisPlayer
 
+
+type NewCurrentPlayer
+    = CurrentIsThisPlayer
+
+
 type Effect
     = OnCells CellEffect String CellScope
     | NextTurn
+    | SetCurrentPlayer NewCurrentPlayer
 
 
 playerGroupDecoder : Decoder TrackerSchema
@@ -463,24 +523,34 @@ actionDecoder =
         (field "text" string)
         (field "effects" (Decode.list effectDecoder))
 
+
 addDecoder : Decoder Expression
 addDecoder =
     Decode.map2 Add (field "op1" expressionDecoder) (field "op2" expressionDecoder)
+
 
 refDecoder : Decoder Expression
 refDecoder =
     Decode.map2 Ref (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
+
 specificExpressionDecoder : String -> Decoder Expression
 specificExpressionDecoder ty =
     case ty of
-        "add" -> addDecoder
-        "ref" -> refDecoder
-        _ -> Decode.fail (ty ++ " is not a valid expression type")
+        "add" ->
+            addDecoder
+
+        "ref" ->
+            refDecoder
+
+        _ ->
+            Decode.fail (ty ++ " is not a valid expression type")
+
 
 expressionDecoder : Decoder Expression
 expressionDecoder =
     field "type" string |> Decode.andThen specificExpressionDecoder
+
 
 wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
@@ -491,30 +561,46 @@ wholeNumberDecoder =
         (field "id" string)
         (Decode.maybe (field "disabled" Decode.bool))
 
+
 calculatedDecoder : Decoder TrackerSchema
 calculatedDecoder =
     Decode.map2
         (\text equals -> Calculated { text = text, equals = equals })
         (field "text" string)
-        (field "equals" expressionDecoder )
+        (field "equals" expressionDecoder)
+
 
 specificTrackerSchemaDecoder : String -> Decoder TrackerSchema
 specificTrackerSchemaDecoder ty =
     case ty of
-        "player-group" -> playerGroupDecoder
-        "group" -> groupDecoder
-        "action" -> actionDecoder
-        "number" -> wholeNumberDecoder
-        "calculated" -> calculatedDecoder
-        _ -> Decode.fail (ty ++ " is not a valid tracker component type")
+        "player-group" ->
+            playerGroupDecoder
+
+        "group" ->
+            groupDecoder
+
+        "action" ->
+            actionDecoder
+
+        "number" ->
+            wholeNumberDecoder
+
+        "calculated" ->
+            calculatedDecoder
+
+        _ ->
+            Decode.fail (ty ++ " is not a valid tracker component type")
+
 
 trackerSchemaDecoder : Decoder TrackerSchema
 trackerSchemaDecoder =
-    (field "type" string) |> Decode.andThen specificTrackerSchemaDecoder
+    field "type" string |> Decode.andThen specificTrackerSchemaDecoder
+
 
 type Expression
     = Add Expression Expression
     | Ref String CellScope
+
 
 type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int }
@@ -522,6 +608,7 @@ type TrackerSchema
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
     | Calculated { text : String, equals : Expression }
+
 
 findMinAndMaxPlayers : TrackerSchema -> List { minPlayers : Int, maxPlayers : Int }
 findMinAndMaxPlayers schema =
@@ -563,6 +650,7 @@ idDefault id schema =
 
         Calculated _ ->
             Nothing
+
 
 trackerTopLevelSchemaDecoder : Decoder TrackerTopLevelSchema
 trackerTopLevelSchemaDecoder =
@@ -685,7 +773,7 @@ multiPlayerDominionTracker =
     ]
   }
 }
-              """
+"""
 
 
 killTeamTracker : String
@@ -725,6 +813,16 @@ killTeamTracker =
         "minPlayers": 2,
         "maxPlayers": 2,
         "items": [
+          {
+            "type": "action",
+            "text": "Has Initiative",
+            "effects": [
+              {
+                "type": "set-current-player",
+                "target": "this-player"
+              }
+            ]
+          },
           {
             "type": "number",
             "text": "Command Points",
