@@ -2,59 +2,11 @@
 
 "Easily configurable" game tally generator.
 
+Examples are current at the bottom of ./src/Main.elm.
+
 * Milestone [3/4]
 ** DONE Singular dominion turn tracker
    CLOSED: [2023-02-20 Mon 15:29]
-   
-#+begin_src json
-{
-  "name": "Dominion Turn Tracker",
-  "tracker": {
-    "type": "group",
-    "items": [
-      {
-        "type": "action",
-        "text": "Reset",
-        "effects": [
-          {
-            "type": "restore-defaults",
-            "items": [
-              {
-                "id": "a"
-              },
-              {
-                "id": "b"
-              },
-              {
-                "id": "em"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "type": "number",
-        "text": "Actions",
-        "default": 1,
-        "id": "a"
-      },
-      {
-        "type": "number",
-        "text": "Buys",
-        "default": 1,
-        "id": "b"
-      },
-      {
-        "type": "number",
-        "text": "Extra Money",
-        "default": 0,
-        "id": "em"
-      }
-    ]
-  }
-}
-#+end_src
- 
 ** DONE Multi-player dominion turn tracker
    CLOSED: [2023-02-20 Mon 19:09]
 ** DONE Simple kill team game tracker
