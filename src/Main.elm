@@ -1,14 +1,15 @@
 module Main exposing (..)
 
 import Browser
+import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h1, h2, input, pre, text, textarea, i)
+import Html exposing (Html, button, div, h1, h2, i, input, pre, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
 import Maybe exposing (Maybe)
 import String exposing (String)
-import Debug as Debug
+
 
 main =
     Browser.sandbox { init = init, update = update, view = view }
@@ -111,7 +112,9 @@ update msg model =
         MoveToPlayerSelection def ->
             case findMinAndMaxPlayers def.tracker of
                 [ players ] ->
-                    PlayerSelectionStage players.minPlayers players def |> toState
+                    if players.minPlayers == players.maxPlayers
+                    then TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = players.maxPlayers } |> toState
+                    else PlayerSelectionStage players.minPlayers players def |> toState
 
                 [] ->
                     TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = 1 } |> toState
@@ -167,10 +170,10 @@ update msg model =
 
         SetNumberOfPlayers schema n ->
             case ( String.toInt n, model.state ) of
-                (Just players, PlayerSelectionStage _ bounds _) ->
-                  PlayerSelectionStage players bounds schema |> toState
---                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
+                ( Just players, PlayerSelectionStage _ bounds _ ) ->
+                    PlayerSelectionStage players bounds schema |> toState
 
+                --                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
 
@@ -287,11 +290,14 @@ viewTrackerComponent tracker state turns playerNumber =
         Action s ->
             button [ onClick (ApplyEffects s.effects) ] [ text s.text ]
 
+
 viewPlayerIndicator : Turns -> Int -> Html TrackMsg
 viewPlayerIndicator turns playerNumber =
-    if turns.currentPlayerTurn == playerNumber
-    then i [] ["Player " ++ String.fromInt ( playerNumber + 1) |> text]
-    else "Player " ++ String.fromInt (playerNumber + 1) |> text
+    if turns.currentPlayerTurn == playerNumber then
+        i [] [ "Player " ++ String.fromInt (playerNumber + 1) |> text ]
+
+    else
+        "Player " ++ String.fromInt (playerNumber + 1) |> text
 
 
 viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> Html Msg
@@ -308,12 +314,12 @@ viewTracker schema state turns =
 
 restoreCurrentPlayerDefaultDecoder : Decoder Effect
 restoreCurrentPlayerDefaultDecoder =
-    Decode.map2 (\targetId _ -> RestoreCurrentPlayerDefault  { targetId = targetId }) (field "targetId" string) (field "scope" string)
+    Decode.map2 (\targetId _ -> RestoreCurrentPlayerDefault { targetId = targetId }) (field "targetId" string) (field "scope" string)
 
 
 restoreDefaultDecoder : Decoder Effect
 restoreDefaultDecoder =
-    Decode.map (\targetId -> RestoreDefault { targetId = targetId }) (field "targetId" string) 
+    Decode.map (\targetId -> RestoreDefault { targetId = targetId }) (field "targetId" string)
 
 
 specificEffectDecoder : String -> Decoder Effect
@@ -512,6 +518,66 @@ multiPlayerDominionTracker =
         "type": "player-group",
         "minPlayers": 2,
         "maxPlayers": 4,
+        "items": [
+          {
+            "type": "number",
+            "text": "Actions",
+            "default": 1,
+            "id": "a"
+          },
+          {
+            "type": "number",
+            "text": "Buys",
+            "default": 1,
+            "id": "b"
+          },
+          {
+            "type": "number",
+            "text": "Extra Money",
+            "default": 0,
+            "id": "em"
+          }
+        ]
+      }
+    ]
+  }
+}
+              """
+
+
+killTeamTracker : String
+killTeamTracker =
+    """
+{
+  "name": "Kill Team Tracker",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "action",
+        "text": "Next Turning Point",
+        "effects": [
+          {
+            "type": "increment",
+            "targetId": "turning-point"
+          },
+          {
+            "type": "increment",
+            "targetId": "command-points",
+            "scope": "all-players"
+          }
+        ]
+      },
+      {
+        "type": "number",
+        "text": "Turning Point",
+        "default": 1,
+        "id": "turning-point"
+      },
+      {
+        "type": "player-group",
+        "minPlayers": 2,
+        "maxPlayers": 2,
         "items": [
           {
             "type": "number",
