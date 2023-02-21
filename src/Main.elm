@@ -153,6 +153,9 @@ update msg model =
                 Err e ->
                     BigError e |> toState
 
+        TrackerMsg _ _ _ (SetWholeNumber _ _ "") ->
+          model
+
         TrackerMsg schema state turns (SetWholeNumber id player rawValue) ->
             case String.toInt rawValue of
                 Just v ->
@@ -168,6 +171,9 @@ update msg model =
 
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
+
+        SetNumberOfPlayers _ "" ->
+            model
 
         SetNumberOfPlayers schema n ->
             case ( String.toInt n, model.state ) of
@@ -304,7 +310,15 @@ viewTrackerComponent : TrackerSchema -> TrackingState -> Turns -> Maybe Int -> H
 viewTrackerComponent tracker state turns playerNumber =
     case tracker of
         WholeNumberSchema s ->
-            div [] [ text s.text, input [ type_ "number", onInput (SetWholeNumber s.id playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] [] ]
+            div []
+                [ text s.text
+                , text " "
+                , if s.disabled then
+                    text (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state))
+
+                  else
+                    input [ type_ "number", onInput (SetWholeNumber s.id playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
+                ]
 
         Group s ->
             div [] (List.map (\i -> viewTrackerComponent i state turns playerNumber) s.items)
@@ -410,11 +424,12 @@ actionDecoder =
 
 wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
-    Decode.map3
-        (\text default id -> WholeNumberSchema { text = text, default = default, id = id })
+    Decode.map4
+        (\text default id disabled -> WholeNumberSchema { text = text, default = default, id = id, disabled = disabled == Just True })
         (field "text" string)
         (field "default" (Decode.map WholeNumber Decode.int))
         (field "id" string)
+        (Decode.maybe (field "disabled" Decode.bool))
 
 
 trackerSchemaDecoder : Decoder TrackerSchema
@@ -426,7 +441,7 @@ type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int }
     | Group { items : List TrackerSchema }
     | Action { text : String, effects : List Effect }
-    | WholeNumberSchema { text : String, default : Value, id : String }
+    | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
 
 
 findMinAndMaxPlayers : TrackerSchema -> List { minPlayers : Int, maxPlayers : Int }
@@ -643,23 +658,6 @@ killTeamTracker =
             "text": "Secondary VP",
             "default": 0,
             "id": "secondary-vp"
-          },
-          {
-            "type": "calculated",
-            "text": "Total VP",
-            "equals": {
-              "type": "add",
-              "op1": {
-                "type": "ref",
-                "targetId": "primary-vp",
-                "scope": "current-player"
-              },
-              "op2": {
-                "type": "ref",
-                "targetId": "secondary-vp",
-                "scope": "current-player"
-              }
-            }
           }
         ]
       }
@@ -669,3 +667,22 @@ killTeamTracker =
 """
 
 
+
+--,
+--          {
+--            "type": "calculated",
+--            "text": "Total VP",
+--            "equals": {
+--              "type": "add",
+--              "op1": {
+--                "type": "ref",
+--                "targetId": "primary-vp",
+--                "scope": "current-player"
+--              },
+--              "op2": {
+--                "type": "ref",
+--                "targetId": "secondary-vp",
+--                "scope": "current-player"
+--              }
+--            }
+--          }
