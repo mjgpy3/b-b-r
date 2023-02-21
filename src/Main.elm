@@ -98,6 +98,7 @@ type Msg
     | TestTracker String Turns
     | TrackerMsg TrackerTopLevelSchema TrackingState Turns TrackMsg
     | SetNumberOfPlayers TrackerTopLevelSchema String
+    | ConfirmNumberOfPlayers TrackerTopLevelSchema
 
 
 update : Msg -> Model -> Model
@@ -110,7 +111,7 @@ update msg model =
         MoveToPlayerSelection def ->
             case findMinAndMaxPlayers def.tracker of
                 [ players ] ->
-                    PlayerSelectionStage 1 players def |> toState
+                    PlayerSelectionStage players.minPlayers players def |> toState
 
                 [] ->
                     TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = 1 } |> toState
@@ -156,12 +157,21 @@ update msg model =
                 Nothing ->
                     CouldNotParseWholeNumber rawValue |> BigError |> toState
 
-        SetNumberOfPlayers schema n ->
-            case String.toInt n of
-                Just players ->
+        ConfirmNumberOfPlayers schema ->
+            case model.state of
+                PlayerSelectionStage players bounds _ ->
                     TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
 
-                Nothing ->
+                _ ->
+                    BigError CouldNotReadNumberOfPlayers |> toState
+
+        SetNumberOfPlayers schema n ->
+            case ( String.toInt n, model.state ) of
+                (Just players, PlayerSelectionStage _ bounds _) ->
+                  PlayerSelectionStage players bounds schema |> toState
+--                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
+
+                _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
 
 
@@ -232,6 +242,7 @@ viewPlayerSelection players { minPlayers, maxPlayers } schema =
     div []
         [ h1 [] [ text "Number of players" ]
         , input [ type_ "number", value (String.fromInt players), onInput (SetNumberOfPlayers schema), Html.Attributes.min (String.fromInt minPlayers), Html.Attributes.max (String.fromInt maxPlayers) ] []
+        , button [ onClick (ConfirmNumberOfPlayers schema) ] [ text "Start game!" ]
         ]
 
 
