@@ -3,7 +3,7 @@ module Main exposing (..)
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h1, h2, i, input, pre, text, textarea)
+import Html exposing (Html, button, div, h1, h2, hr, i, input, pre, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
@@ -64,11 +64,17 @@ type Error
     | CannotSetCurrentPlayerToThisWithEffectsOutsideContext
 
 
+type Log
+    = GameStarted Turns
+    | ActionPerformed (Maybe Int) String (List Effect)
+    | ValueUpdated (Maybe Int) String Value
+
+
 type StageState
     = DefinitionStage DefinitionValidity
     | PlayerSelectionStage Int { minPlayers : Int, maxPlayers : Int } TrackerTopLevelSchema
-    | TrackerStage TrackerTopLevelSchema TrackingState Turns
     | BigError Error
+    | TrackerStage TrackerTopLevelSchema TrackingState Turns (List Log)
 
 
 type alias Stage =
@@ -87,8 +93,8 @@ init =
 
 
 type TrackMsg
-    = ApplyEffects (Maybe Int) (List Effect)
-    | SetWholeNumber String (Maybe Int) String
+    = ApplyEffects (Maybe Int) String (List Effect)
+    | SetWholeNumber String String (Maybe Int) String
 
 
 type Msg
@@ -107,19 +113,39 @@ update msg model =
     let
         toState state =
             { schemaJson = model.schemaJson, state = state }
+
+        withLogs schema state players newLogs =
+            let
+                oldLogs =
+                    case model.state of
+                        TrackerStage _ _ _ logs ->
+                            logs
+
+                        _ ->
+                            []
+            in
+            TrackerStage schema state players (oldLogs ++ newLogs) |> toState
     in
     case msg of
         MoveToPlayerSelection def ->
             case findMinAndMaxPlayers def.tracker of
                 [ players ] ->
                     if players.minPlayers == players.maxPlayers then
-                        TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = players.maxPlayers } |> toState
+                        let
+                            turns =
+                                { currentPlayerTurn = 0, playerCount = players.maxPlayers }
+                        in
+                        withLogs def Dict.empty turns [ GameStarted turns ]
 
                     else
                         PlayerSelectionStage players.minPlayers players def |> toState
 
                 [] ->
-                    TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = 1 } |> toState
+                    let
+                        turns =
+                            { currentPlayerTurn = 0, playerCount = 1 }
+                    in
+                    withLogs def Dict.empty turns [ GameStarted turns ]
 
                 _ ->
                     BigError TooManyPlayerGroupsDefined |> toState
@@ -141,26 +167,34 @@ update msg model =
                     { schemaJson = def, state = InvalidDefinition e |> DefinitionStage }
 
                 Ok d ->
-                    { schemaJson = def, state = TrackerStage d Dict.empty turns }
+                    let
+                        newModel =
+                            withLogs d Dict.empty turns [ GameStarted turns ]
+                    in
+                    { newModel | schemaJson = def }
 
         CreateTracker def turns ->
-            TrackerStage def Dict.empty turns |> toState
+            withLogs def Dict.empty turns [ GameStarted turns ]
 
-        TrackerMsg schema state turns (ApplyEffects thisPlayer effects) ->
+        TrackerMsg schema state turns (ApplyEffects thisPlayer action effects) ->
             case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
                 Ok ( sc, st, ts ) ->
-                    TrackerStage sc st ts |> toState
+                    withLogs sc st ts [ ActionPerformed thisPlayer action effects ]
 
                 Err e ->
                     BigError e |> toState
 
-        TrackerMsg _ _ _ (SetWholeNumber _ _ "") ->
+        TrackerMsg _ _ _ (SetWholeNumber _ _ _ "") ->
             model
 
-        TrackerMsg schema state turns (SetWholeNumber id player rawValue) ->
+        TrackerMsg schema state turns (SetWholeNumber id field player rawValue) ->
             case String.toInt rawValue of
                 Just v ->
-                    TrackerStage schema (Dict.insert (key id player) (WholeNumber v) state) turns |> toState
+                    let
+                        num =
+                            WholeNumber v
+                    in
+                    withLogs schema (Dict.insert (key id player) num state) turns [ ValueUpdated player field num ]
 
                 Nothing ->
                     CouldNotParseWholeNumber rawValue |> BigError |> toState
@@ -168,7 +202,11 @@ update msg model =
         ConfirmNumberOfPlayers schema ->
             case model.state of
                 PlayerSelectionStage players bounds _ ->
-                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
+                    let
+                        turns =
+                            { currentPlayerTurn = 0, playerCount = players }
+                    in
+                    withLogs schema Dict.empty turns [ GameStarted turns ]
 
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
@@ -251,8 +289,11 @@ view model =
         DefinitionStage valid ->
             viewEditTracker model.schemaJson valid
 
-        TrackerStage def state turns ->
-            viewTracker def state turns
+        TrackerStage def state turns log ->
+            div []
+                [ viewTracker def state turns
+                , viewLogs log
+                ]
 
         PlayerSelectionStage current players schema ->
             viewPlayerSelection current players schema
@@ -286,6 +327,36 @@ view model =
                         text "To set this-player as the current player the effects must originate from the context of a player"
                 , button [ onClick MoveToEdit ] [ text "Return to edit" ]
                 ]
+
+
+viewLogs : List Log -> Html Msg
+viewLogs entries =
+    div [] (h1 [] [ text "History" ] :: List.map viewLog entries)
+
+
+viewLog : Log -> Html Msg
+viewLog log =
+    div []
+        [ case log of
+            GameStarted turns ->
+                if turns.playerCount > 1 then
+                    text (String.fromInt turns.playerCount ++ " player game started, player " ++ String.fromInt (turns.currentPlayerTurn + 1) ++ "'s turn")
+
+                else
+                    text "Game started"
+
+            ActionPerformed (Just player) action _ ->
+                text ("Player " ++ String.fromInt (player + 1) ++ " " ++ action)
+
+            ActionPerformed Nothing action _ ->
+                text action
+
+            ValueUpdated Nothing thing value ->
+                text (thing ++ " updated to " ++ valueToString value)
+
+            ValueUpdated (Just player) thing value ->
+                text ("Player " ++ String.fromInt (player + 1) ++ "'s " ++ thing ++ " updated to " ++ valueToString value)
+        ]
 
 
 viewPlayerSelection : Int -> { minPlayers : Int, maxPlayers : Int } -> TrackerTopLevelSchema -> Html Msg
@@ -380,7 +451,7 @@ viewTrackerComponent schema tracker state turns playerNumber =
                     text (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state))
 
                   else
-                    input [ type_ "number", onInput (SetWholeNumber s.id playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
+                    input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
                 ]
 
         Calculated s ->
@@ -402,7 +473,7 @@ viewTrackerComponent schema tracker state turns playerNumber =
             List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) ]) |> div []
 
         Action s ->
-            button [ onClick (ApplyEffects playerNumber s.effects) ] [ text s.text ]
+            button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
 
 
 viewPlayerIndicator : Turns -> Int -> Html TrackMsg

@@ -4,13 +4,15 @@
 
 Examples are current at the bottom of ./src/Main.elm.
 
-* Items [0/11]
-** TODO Top-level history
+* Items [1/12]
+** DONE Top-level history
+   CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
 ** TODO Then "Undo" 
 ** TODO Then way to replay history (e.g. resume game) 
 ** TODO Then way to persist state locally (don't lose on refresh)
 ** TODO Then way to download history 
+** TODO Player aliases 
 ** TODO Better current player indicator 
 ** TODO Regression tests
 ** TODO Base64 URLs
