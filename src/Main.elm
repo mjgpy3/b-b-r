@@ -208,6 +208,9 @@ applyEffect eff result =
 
                                 AllPlayers ->
                                     List.range 0 (turns.playerCount - 1) |> List.map (\i -> key targetId (Just i))
+
+                                ThisPlayer ->
+                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> key targetId (Just i))
                     in
                     case idDefault targetId schema.tracker of
                         Just default ->
@@ -253,6 +256,9 @@ view model =
                         text ("Could not find non-player component ID when applying effect: " ++ id)
 
                     ComponentIdNotFound CurrentPlayer id ->
+                        text ("Could not find component ID in player-group when applying effect: " ++ id)
+
+                    ComponentIdNotFound ThisPlayer id ->
                         text ("Could not find component ID in player-group when applying effect: " ++ id)
 
                     ComponentIdNotFound AllPlayers id ->
@@ -305,9 +311,33 @@ viewEditTracker def valid =
         , div [] [ button [ onClick (TestTracker killTeamTracker { currentPlayerTurn = 0, playerCount = 2 }) ] [ text "Kill team" ] ]
         ]
 
+eval : TrackerTopLevelSchema -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
+eval schema expr thisPlayer state currentPlayer =
+    let
+        aux e =
+            case e of
+              Add op1 op2 -> case (aux op1, aux op2) of
+                                (Ok (WholeNumber a), Ok (WholeNumber b)) -> Ok (WholeNumber (a+b))
+                                (Err err, _) -> Err err
+                                (_, Err err) -> Err err
+              Ref targetId scope ->
+                let
+                    player = case (scope, thisPlayer) of
+                                    ( NonPlayer , _) -> Ok Nothing
+                                    ( CurrentPlayer , _) -> Ok (Just currentPlayer)
+                                    ( AllPlayers , _) -> Err "Calculated fields cannot reference all players"
+                                    ( ThisPlayer, Just this) -> Ok (Just this)
+                                    ( ThisPlayer, Nothing) -> Err "Referenced this player, but couldn't find them"
 
-viewTrackerComponent : TrackerSchema -> TrackingState -> Turns -> Maybe Int -> Html TrackMsg
-viewTrackerComponent tracker state turns playerNumber =
+                in
+                    case idDefault targetId schema.tracker of
+                        Just default -> player |> Result.map (\p -> Maybe.withDefault default (Dict.get (key targetId p) state))
+                        Nothing -> Err ( "Could not find identifier " ++ targetId ++ " anywhere")
+    in
+      aux expr
+
+viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> Html TrackMsg
+viewTrackerComponent schema tracker state turns playerNumber =
     case tracker of
         WholeNumberSchema s ->
             div []
@@ -320,11 +350,20 @@ viewTrackerComponent tracker state turns playerNumber =
                     input [ type_ "number", onInput (SetWholeNumber s.id playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
                 ]
 
+        Calculated s ->
+            div []
+                [ text s.text
+                , text " "
+                , case eval schema s.equals playerNumber state turns.currentPlayerTurn of
+                      Ok (WholeNumber v) -> v |> String.fromInt |> text
+                      Err e -> text ("Error: " ++ e)
+                ]
+
         Group s ->
-            div [] (List.map (\i -> viewTrackerComponent i state turns playerNumber) s.items)
+            div [] (List.map (\i -> viewTrackerComponent schema i state turns playerNumber) s.items)
 
         PlayerGroup s ->
-            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i ], viewTrackerComponent (Group { items = s.items }) state turns (Just i) ]) |> div []
+            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) ]) |> div []
 
         Action s ->
             button [ onClick (ApplyEffects s.effects) ] [ text s.text ]
@@ -343,7 +382,7 @@ viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> Html Msg
 viewTracker schema state turns =
     div []
         [ h1 [] [ text schema.name ]
-        , Html.map (TrackerMsg schema state turns) <| viewTrackerComponent schema.tracker state turns Nothing
+        , Html.map (TrackerMsg schema state turns) <| viewTrackerComponent schema schema.tracker state turns Nothing
         ]
 
 
@@ -359,6 +398,9 @@ cellScopeDecoder scope =
 
         Just "current-player" ->
             Decode.succeed CurrentPlayer
+
+        Just "this-player" ->
+            Decode.succeed ThisPlayer
 
         Just "all-players" ->
             Decode.succeed AllPlayers
@@ -397,7 +439,7 @@ type CellScope
     = NonPlayer
     | CurrentPlayer
     | AllPlayers
-
+    | ThisPlayer
 
 type Effect
     = OnCells CellEffect String CellScope
@@ -421,6 +463,24 @@ actionDecoder =
         (field "text" string)
         (field "effects" (Decode.list effectDecoder))
 
+addDecoder : Decoder Expression
+addDecoder =
+    Decode.map2 Add (field "op1" expressionDecoder) (field "op2" expressionDecoder)
+
+refDecoder : Decoder Expression
+refDecoder =
+    Decode.map2 Ref (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
+
+specificExpressionDecoder : String -> Decoder Expression
+specificExpressionDecoder ty =
+    case ty of
+        "add" -> addDecoder
+        "ref" -> refDecoder
+        _ -> Decode.fail (ty ++ " is not a valid expression type")
+
+expressionDecoder : Decoder Expression
+expressionDecoder =
+    field "type" string |> Decode.andThen specificExpressionDecoder
 
 wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
@@ -431,18 +491,37 @@ wholeNumberDecoder =
         (field "id" string)
         (Decode.maybe (field "disabled" Decode.bool))
 
+calculatedDecoder : Decoder TrackerSchema
+calculatedDecoder =
+    Decode.map2
+        (\text equals -> Calculated { text = text, equals = equals })
+        (field "text" string)
+        (field "equals" expressionDecoder )
+
+specificTrackerSchemaDecoder : String -> Decoder TrackerSchema
+specificTrackerSchemaDecoder ty =
+    case ty of
+        "player-group" -> playerGroupDecoder
+        "group" -> groupDecoder
+        "action" -> actionDecoder
+        "number" -> wholeNumberDecoder
+        "calculated" -> calculatedDecoder
+        _ -> Decode.fail (ty ++ " is not a valid tracker component type")
 
 trackerSchemaDecoder : Decoder TrackerSchema
 trackerSchemaDecoder =
-    Decode.lazy <| \_ -> Decode.oneOf [ playerGroupDecoder, groupDecoder, actionDecoder, wholeNumberDecoder ]
+    (field "type" string) |> Decode.andThen specificTrackerSchemaDecoder
 
+type Expression
+    = Add Expression Expression
+    | Ref String CellScope
 
 type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int }
     | Group { items : List TrackerSchema }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
-
+    | Calculated { text : String, equals : Expression }
 
 findMinAndMaxPlayers : TrackerSchema -> List { minPlayers : Int, maxPlayers : Int }
 findMinAndMaxPlayers schema =
@@ -457,6 +536,9 @@ findMinAndMaxPlayers schema =
             { minPlayers = s.minPlayers, maxPlayers = s.maxPlayers } :: List.concatMap findMinAndMaxPlayers s.items
 
         Action _ ->
+            []
+
+        Calculated _ ->
             []
 
 
@@ -479,6 +561,8 @@ idDefault id schema =
         Action s ->
             Nothing
 
+        Calculated _ ->
+            Nothing
 
 trackerTopLevelSchemaDecoder : Decoder TrackerTopLevelSchema
 trackerTopLevelSchemaDecoder =
@@ -658,6 +742,23 @@ killTeamTracker =
             "text": "Secondary VP",
             "default": 0,
             "id": "secondary-vp"
+          },
+          {
+            "type": "calculated",
+            "text": "Total VP",
+            "equals": {
+              "type": "add",
+              "op1": {
+                "type": "ref",
+                "targetId": "primary-vp",
+                "scope": "this-player"
+              },
+              "op2": {
+                "type": "ref",
+                "targetId": "secondary-vp",
+                "scope": "this-player"
+              }
+            }
           }
         ]
       }
@@ -665,24 +766,3 @@ killTeamTracker =
   }
 }
 """
-
-
-
---,
---          {
---            "type": "calculated",
---            "text": "Total VP",
---            "equals": {
---              "type": "add",
---              "op1": {
---                "type": "ref",
---                "targetId": "primary-vp",
---                "scope": "current-player"
---              },
---              "op2": {
---                "type": "ref",
---                "targetId": "secondary-vp",
---                "scope": "current-player"
---              }
---            }
---          }
