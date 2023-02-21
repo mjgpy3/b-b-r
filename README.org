@@ -4,11 +4,17 @@
 
 Examples are current at the bottom of ./src/Main.elm.
 
-* Milestone [3/4]
-** DONE Singular dominion turn tracker
-   CLOSED: [2023-02-20 Mon 15:29]
-** DONE Multi-player dominion turn tracker
-   CLOSED: [2023-02-20 Mon 19:09]
-** DONE Simple kill team game tracker
-   CLOSED: [2023-02-20 Mon 22:07]
-** TODO Kill team game tracker enhancements
+* Items [0/11]
+** TODO Top-level history
+** TODO Then effect-level history 
+** TODO Then "Undo" 
+** TODO Then way to replay history (e.g. resume game) 
+** TODO Then way to persist state locally (don't lose on refresh)
+** TODO Then way to download history 
+** TODO Better current player indicator 
+** TODO Regression tests
+** TODO Base64 URLs
+** TODO Kill team improvements [0/2]
+*** TODO Way to track wounds 
+*** TODO Then enhance wounds with images
+** TODO Start more complicate case 
