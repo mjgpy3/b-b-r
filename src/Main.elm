@@ -57,8 +57,7 @@ type alias Turns =
 
 
 type Error
-    = ComponentIdNotFound String
-    | PlayerComponentIdNotFound String
+    = ComponentIdNotFound CellScope String
     | CouldNotReadNumberOfPlayers
     | CouldNotParseWholeNumber String
     | TooManyPlayerGroupsDefined
@@ -112,9 +111,11 @@ update msg model =
         MoveToPlayerSelection def ->
             case findMinAndMaxPlayers def.tracker of
                 [ players ] ->
-                    if players.minPlayers == players.maxPlayers
-                    then TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = players.maxPlayers } |> toState
-                    else PlayerSelectionStage players.minPlayers players def |> toState
+                    if players.minPlayers == players.maxPlayers then
+                        TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = players.maxPlayers } |> toState
+
+                    else
+                        PlayerSelectionStage players.minPlayers players def |> toState
 
                 [] ->
                     TrackerStage def Dict.empty { currentPlayerTurn = 0, playerCount = 1 } |> toState
@@ -189,21 +190,41 @@ applyEffect eff result =
                 NextTurn ->
                     Ok ( schema, state, { turns | currentPlayerTurn = modBy turns.playerCount (turns.currentPlayerTurn + 1) } )
 
-                RestoreDefault { targetId } ->
+                OnCells op targetId scope ->
+                    let
+                        scopedKeys =
+                            case scope of
+                                NonPlayer ->
+                                    [ targetId ]
+
+                                CurrentPlayer ->
+                                    [ key targetId (Just turns.currentPlayerTurn) ]
+
+                                AllPlayers ->
+                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> key targetId (Just i))
+                    in
                     case idDefault targetId schema.tracker of
                         Just default ->
-                            Ok <| ( schema, Dict.insert targetId default state, turns )
+                            let
+                                newValue currentValue =
+                                    case ( op, currentValue ) of
+                                        ( RestoreDefault, _ ) ->
+                                            Ok default
+
+                                        ( Adjust amount, WholeNumber v ) ->
+                                            v + amount |> WholeNumber |> Ok
+
+                                apply scopedKey res =
+                                    res
+                                        |> Result.andThen
+                                            (\( sc, st, tu ) ->
+                                                newValue (Maybe.withDefault default (Dict.get scopedKey st)) |> Result.map (\v -> ( sc, Dict.insert scopedKey v st, tu ))
+                                            )
+                            in
+                            List.foldl apply (Ok ( schema, state, turns )) scopedKeys
 
                         Nothing ->
-                            Err <| ComponentIdNotFound targetId
-
-                RestoreCurrentPlayerDefault { targetId } ->
-                    case idDefault targetId schema.tracker of
-                        Just default ->
-                            Ok <| ( schema, Dict.insert (key targetId (Just turns.currentPlayerTurn)) default state, turns )
-
-                        Nothing ->
-                            Err <| PlayerComponentIdNotFound targetId
+                            Err <| ComponentIdNotFound scope targetId
 
 
 view : Model -> Html Msg
@@ -222,10 +243,13 @@ view model =
             div []
                 [ h1 [] [ text "Error" ]
                 , case err of
-                    ComponentIdNotFound id ->
-                        text ("Could not find global component ID when applying effect: " ++ id)
+                    ComponentIdNotFound NonPlayer id ->
+                        text ("Could not find non-player component ID when applying effect: " ++ id)
 
-                    PlayerComponentIdNotFound id ->
+                    ComponentIdNotFound CurrentPlayer id ->
+                        text ("Could not find component ID in player-group when applying effect: " ++ id)
+
+                    ComponentIdNotFound AllPlayers id ->
                         text ("Could not find component ID in player-group when applying effect: " ++ id)
 
                     CouldNotReadNumberOfPlayers ->
@@ -272,6 +296,7 @@ viewEditTracker def valid =
         , div [] [ h1 [] [ text "Test Tracker" ] ]
         , div [] [ button [ onClick (TestTracker simpleDominionTracker { currentPlayerTurn = 0, playerCount = 1 }) ] [ text "Dominion turn tracker" ] ]
         , div [] [ button [ onClick (TestTracker multiPlayerDominionTracker { currentPlayerTurn = 0, playerCount = 3 }) ] [ text "Multi-player Dominion turn tracker" ] ]
+        , div [] [ button [ onClick (TestTracker killTeamTracker { currentPlayerTurn = 0, playerCount = 2 }) ] [ text "Kill team" ] ]
         ]
 
 
@@ -312,14 +337,20 @@ viewTracker schema state turns =
 -- Tracker Schema
 
 
-restoreCurrentPlayerDefaultDecoder : Decoder Effect
-restoreCurrentPlayerDefaultDecoder =
-    Decode.map2 (\targetId _ -> RestoreCurrentPlayerDefault { targetId = targetId }) (field "targetId" string) (field "scope" string)
+cellScopeDecoder : Maybe String -> Decoder CellScope
+cellScopeDecoder scope =
+    case scope of
+        Nothing ->
+            Decode.succeed NonPlayer
 
+        Just "current-player" ->
+            Decode.succeed CurrentPlayer
 
-restoreDefaultDecoder : Decoder Effect
-restoreDefaultDecoder =
-    Decode.map (\targetId -> RestoreDefault { targetId = targetId }) (field "targetId" string)
+        Just "all-players" ->
+            Decode.succeed AllPlayers
+
+        Just s ->
+            Decode.fail (s ++ " is not a valid effect scope")
 
 
 specificEffectDecoder : String -> Decoder Effect
@@ -329,7 +360,10 @@ specificEffectDecoder ty =
             Decode.succeed NextTurn
 
         "restore-default" ->
-            Decode.lazy <| \_ -> Decode.oneOf [ restoreCurrentPlayerDefaultDecoder, restoreDefaultDecoder ]
+            Decode.map2 (OnCells RestoreDefault) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
+
+        "adjust" ->
+            Decode.map3 (\a -> OnCells (Adjust a)) (field "amount" Decode.int) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
         _ ->
             Decode.fail (ty ++ " is not a valid effect type")
@@ -340,9 +374,19 @@ effectDecoder =
     field "type" string |> Decode.andThen specificEffectDecoder
 
 
+type CellEffect
+    = RestoreDefault
+    | Adjust Int
+
+
+type CellScope
+    = NonPlayer
+    | CurrentPlayer
+    | AllPlayers
+
+
 type Effect
-    = RestoreDefault { targetId : String }
-    | RestoreCurrentPlayerDefault { targetId : String }
+    = OnCells CellEffect String CellScope
     | NextTurn
 
 
@@ -623,3 +667,5 @@ killTeamTracker =
   }
 }
 """
+
+
