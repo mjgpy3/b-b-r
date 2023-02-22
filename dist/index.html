@@ -6960,10 +6960,10 @@ function $author$project$Main$cyclic$playerGroupDecoder() {
 				$author$project$Main$cyclic$trackerSchemaDecoder())),
 		A2($elm$json$Json$Decode$field, 'minPlayers', $elm$json$Json$Decode$int),
 		A2($elm$json$Json$Decode$field, 'maxPlayers', $elm$json$Json$Decode$int),
-		A2(
-			$elm$json$Json$Decode$field,
-			'defaultAliases',
-			$elm$json$Json$Decode$maybe(
+		$elm$json$Json$Decode$maybe(
+			A2(
+				$elm$json$Json$Decode$field,
+				'defaultAliases',
 				$elm$json$Json$Decode$list($elm$json$Json$Decode$string))));
 }
 function $author$project$Main$cyclic$trackerSchemaDecoder() {
