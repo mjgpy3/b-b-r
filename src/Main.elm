@@ -464,18 +464,29 @@ viewEditTracker def url valid =
 eval : TrackerTopLevelSchema -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
 eval schema expr thisPlayer state currentPlayer =
     let
+        op o a b =
+            case b of
+                Err err ->
+                    Err err
+
+                Ok (WholeNumber v2) ->
+                    case aux a of
+                        Ok (WholeNumber v1) ->
+                            Ok (WholeNumber (o v1 v2))
+
+                        Err err ->
+                            Err err
+
         aux e =
             case e of
-                Add op1 op2 ->
-                    case ( aux op1, aux op2 ) of
-                        ( Ok (WholeNumber a), Ok (WholeNumber b) ) ->
-                            Ok (WholeNumber (a + b))
+                Op Add ops ->
+                    List.foldl (op (\a b -> a + b)) (WholeNumber 0 |> Ok) ops
 
-                        ( Err err, _ ) ->
-                            Err err
+                Op Mul ops ->
+                    List.foldl (op (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
 
-                        ( _, Err err ) ->
-                            Err err
+                Literal v ->
+                    Ok v
 
                 Ref targetId scope ->
                     let
@@ -677,9 +688,9 @@ actionDecoder =
         (field "effects" (Decode.list effectDecoder))
 
 
-addDecoder : Decoder Expression
-addDecoder =
-    Decode.map2 Add (field "op1" expressionDecoder) (field "op2" expressionDecoder)
+opDecoder : Operator -> Decoder Expression
+opDecoder op =
+    Decode.map (\ops -> Op op ops) (field "ops" (Decode.list expressionDecoder))
 
 
 refDecoder : Decoder Expression
@@ -687,14 +698,25 @@ refDecoder =
     Decode.map2 Ref (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
 
+literalDecoder : Decoder Expression
+literalDecoder =
+    Decode.map Literal (field "value" (Decode.map WholeNumber Decode.int))
+
+
 specificExpressionDecoder : String -> Decoder Expression
 specificExpressionDecoder ty =
     case ty of
         "add" ->
-            addDecoder
+            opDecoder Add
+
+        "mul" ->
+            opDecoder Mul
 
         "ref" ->
             refDecoder
+
+        "literal" ->
+            literalDecoder
 
         _ ->
             Decode.fail (ty ++ " is not a valid expression type")
@@ -750,9 +772,15 @@ trackerSchemaDecoder =
     field "type" string |> Decode.andThen specificTrackerSchemaDecoder
 
 
+type Operator
+    = Add
+    | Mul
+
+
 type Expression
-    = Add Expression Expression
+    = Op Operator (List Expression)
     | Ref String CellScope
+    | Literal Value
 
 
 type TrackerSchema

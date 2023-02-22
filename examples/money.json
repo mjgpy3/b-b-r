@@ -1,0 +1,142 @@
+{
+  "name": "Money",
+  "tracker": {
+    "type": "player-group",
+    "minPlayers": 2,
+    "maxPlayers": 2,
+    "defaultAliases": [
+      "Bucket 1",
+      "Bucket 2"
+    ],
+    "items": [
+      {
+        "type": "number",
+        "text": "Pennies",
+        "default": 0,
+        "id": "pennies"
+      },
+      {
+        "type": "number",
+        "text": "Nickels",
+        "default": 0,
+        "id": "nickels"
+      },
+      {
+        "type": "number",
+        "text": "Dimes",
+        "default": 0,
+        "id": "dimes"
+      },
+      {
+        "type": "number",
+        "text": "Quarters",
+        "default": 0,
+        "id": "quarters"
+      },
+      {
+        "type": "number",
+        "text": "Ones",
+        "default": 0,
+        "id": "ones"
+      },
+      {
+        "type": "number",
+        "text": "Fives",
+        "default": 0,
+        "id": "fives"
+      },
+      {
+        "type": "number",
+        "text": "Tens",
+        "default": 0, "id": "tens"
+      },
+      {
+        "type": "number",
+        "text": "Twenties",
+        "default": 0,
+        "id": "twenties"
+      },
+      {
+        "type": "number",
+        "text": "Fifties",
+        "default": 0,
+        "id": "fifties"
+      },
+      {
+        "type": "number",
+        "text": "Hundreds",
+        "default": 0,
+        "id": "hundreds"
+      },
+      {
+        "type": "calculated",
+        "text": "Bucket Total",
+        "equals": {
+          "type": "add",
+          "ops": [
+            {
+              "type": "ref",
+              "targetId": "ones",
+              "scope": "this-player"
+            },
+            {
+              "type": "mul",
+              "ops": [
+                  { "type": "literal", "value": 5 },
+                  {
+                      "type": "ref",
+                      "targetId": "fives",
+                      "scope": "this-player"
+                  }
+              ]
+            },
+            {
+                "type": "mul",
+                "ops": [
+                    { "type": "literal", "value": 10 },
+                    {
+                        "type": "ref",
+                        "targetId": "tens",
+                        "scope": "this-player"
+                    }
+                ]
+            },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 20 },
+                      {
+                          "type": "ref",
+                          "targetId": "twenties",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 50 },
+                      {
+                          "type": "ref",
+                          "targetId": "fifties",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 100 },
+                      {
+                          "type": "ref",
+                          "targetId": "hundreds",
+                          "scope": "this-player"
+                      }
+                  ]
+              }
+          ]
+        }
+      }
+    ]
+  }
+}

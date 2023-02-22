@@ -65,16 +65,18 @@
             "text": "Total VP",
             "equals": {
               "type": "add",
-              "op1": {
-                "type": "ref",
-                "targetId": "primary-vp",
-                "scope": "this-player"
-              },
-              "op2": {
-                "type": "ref",
-                "targetId": "secondary-vp",
-                "scope": "this-player"
-              }
+                "ops": [
+                    {
+                        "type": "ref",
+                        "targetId": "primary-vp",
+                        "scope": "this-player"
+                    },
+                    {
+                        "type": "ref",
+                        "targetId": "secondary-vp",
+                        "scope": "this-player"
+                    }
+                ]
             }
           }
         ]
