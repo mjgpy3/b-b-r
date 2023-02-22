@@ -48,23 +48,18 @@ initApp _ url =
     in
     case ( decode "edit", decode "track" ) of
         ( Just schema, _ ) ->
-            Debug.log "edit existing" ( init url |> update (UpdateDefinition schema), Cmd.none )
+            ( init url |> update (UpdateDefinition schema), Cmd.none )
 
         ( Nothing, Just schema ) ->
             case Decode.decodeString trackerTopLevelSchemaDecoder schema of
                 Err e ->
-                    Debug.log "bad track" ( { schemaJson = schema, url = url, state = InvalidDefinition e |> DefinitionStage }, Cmd.none )
+                    ( { schemaJson = schema, url = url, state = InvalidDefinition e |> DefinitionStage }, Cmd.none )
 
                 Ok d ->
                     ( { schemaJson = schema, url = url, state = (init url).state } |> update (MoveToPlayerSelection d), Cmd.none )
 
         _ ->
             ( init url, Cmd.none )
-
-
-
--- http://localhost:8000/src/Main.elm?track=abc
--- http://localhost:8000/src/Main.elm?edit=abc
 
 
 type DefinitionValidity
@@ -472,7 +467,7 @@ viewEditTracker def url valid =
             StartingOut ->
                 text ""
         , div [] [ makeUrl "edit" def url ]
-        , div [] [ h1 [] [ text "Test Tracker" ] ]
+        , div [] [ h1 [] [ text "Test Trackers" ] ]
         , div [] [ button [ onClick (TestTracker simpleDominionTracker { currentPlayerTurn = 0, playerCount = 1 }) ] [ text "Dominion turn tracker" ] ]
         , div [] [ button [ onClick (TestTracker multiPlayerDominionTracker { currentPlayerTurn = 0, playerCount = 3 }) ] [ text "Multi-player Dominion turn tracker" ] ]
         , div [] [ button [ onClick (TestTracker killTeamTracker { currentPlayerTurn = 0, playerCount = 2 }) ] [ text "Kill team" ] ]
