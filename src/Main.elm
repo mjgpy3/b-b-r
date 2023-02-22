@@ -116,12 +116,13 @@ type Log
     | ActionPerformed (Maybe Int) String (List Effect)
     | ValueUpdated (Maybe Int) String Value
 
+type alias PlayerAliases = Dict Int String
 
 type StageState
     = DefinitionStage DefinitionValidity
-    | PlayerSelectionStage Int { minPlayers : Int, maxPlayers : Int } TrackerTopLevelSchema
+    | PlayerSelectionStage Int { minPlayers : Int, maxPlayers : Int } TrackerTopLevelSchema PlayerAliases
     | BigError Error
-    | TrackerStage TrackerTopLevelSchema TrackingState Turns (List Log)
+    | TrackerStage TrackerTopLevelSchema TrackingState Turns (List Log) PlayerAliases
 
 
 type alias Stage =
@@ -147,11 +148,10 @@ type TrackMsg
 
 type Msg
     = UpdateDefinition String
-    | CreateTracker TrackerTopLevelSchema Turns
     | MoveToPlayerSelection TrackerTopLevelSchema
     | MoveToEdit
     | TestTracker String Turns
-    | TrackerMsg TrackerTopLevelSchema TrackingState Turns TrackMsg
+    | TrackerMsg TrackerTopLevelSchema TrackingState Turns PlayerAliases TrackMsg
     | SetNumberOfPlayers TrackerTopLevelSchema String
     | ConfirmNumberOfPlayers TrackerTopLevelSchema
     | Noop
@@ -163,41 +163,41 @@ update msg model =
         toState state =
             { schemaJson = model.schemaJson, url = model.url, state = state }
 
-        withLogs schema state players newLogs =
+        withLogs schema state players newLogs aliases =
             let
                 oldLogs =
                     case model.state of
-                        TrackerStage _ _ _ logs ->
+                        TrackerStage _ _ _ logs _ ->
                             logs
 
                         _ ->
                             []
             in
-            TrackerStage schema state players (oldLogs ++ newLogs) |> toState
+              TrackerStage schema state players (oldLogs ++ newLogs) aliases |> toState
     in
     case msg of
         Noop ->
             model
 
         MoveToPlayerSelection def ->
-            case findMinAndMaxPlayers def.tracker of
-                [ players ] ->
+            case findPlayerGroup def.tracker of
+                [ (players, aliases) ] ->
                     if players.minPlayers == players.maxPlayers then
                         let
                             turns =
                                 { currentPlayerTurn = 0, playerCount = players.maxPlayers }
                         in
-                        withLogs def Dict.empty turns [ GameStarted turns ]
+                        withLogs def Dict.empty turns [ GameStarted turns ] aliases
 
                     else
-                        PlayerSelectionStage players.minPlayers players def |> toState
+                        PlayerSelectionStage players.minPlayers players def aliases |> toState
 
                 [] ->
                     let
                         turns =
                             { currentPlayerTurn = 0, playerCount = 1 }
                     in
-                    withLogs def Dict.empty turns [ GameStarted turns ]
+                    withLogs def Dict.empty turns [ GameStarted turns ] Dict.empty
 
                 _ ->
                     BigError TooManyPlayerGroupsDefined |> toState
@@ -221,44 +221,41 @@ update msg model =
                 Ok d ->
                     let
                         newModel =
-                            withLogs d Dict.empty turns [ GameStarted turns ]
+                            withLogs d Dict.empty turns [ GameStarted turns ] Dict.empty
                     in
                     { newModel | schemaJson = def }
 
-        CreateTracker def turns ->
-            withLogs def Dict.empty turns [ GameStarted turns ]
-
-        TrackerMsg schema state turns (ApplyEffects thisPlayer action effects) ->
+        TrackerMsg schema state turns aliases (ApplyEffects thisPlayer action effects) ->
             case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
                 Ok ( sc, st, ts ) ->
-                    withLogs sc st ts [ ActionPerformed thisPlayer action effects ]
+                    withLogs sc st ts [ ActionPerformed thisPlayer action effects ] aliases
 
                 Err e ->
                     BigError e |> toState
 
-        TrackerMsg _ _ _ (SetWholeNumber _ _ _ "") ->
+        TrackerMsg _ _ _ _ (SetWholeNumber _ _ _ "") ->
             model
 
-        TrackerMsg schema state turns (SetWholeNumber id field player rawValue) ->
+        TrackerMsg schema state turns aliases (SetWholeNumber id field player rawValue) ->
             case String.toInt rawValue of
                 Just v ->
                     let
                         num =
                             WholeNumber v
                     in
-                    withLogs schema (Dict.insert (key id player) num state) turns [ ValueUpdated player field num ]
+                    withLogs schema (Dict.insert (key id player) num state) turns [ ValueUpdated player field num ] aliases
 
                 Nothing ->
                     CouldNotParseWholeNumber rawValue |> BigError |> toState
 
         ConfirmNumberOfPlayers schema ->
             case model.state of
-                PlayerSelectionStage players bounds _ ->
+                PlayerSelectionStage players bounds _ aliases ->
                     let
                         turns =
                             { currentPlayerTurn = 0, playerCount = players }
                     in
-                    withLogs schema Dict.empty turns [ GameStarted turns ]
+                    withLogs schema Dict.empty turns [ GameStarted turns ] aliases
 
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
@@ -268,8 +265,8 @@ update msg model =
 
         SetNumberOfPlayers schema n ->
             case ( String.toInt n, model.state ) of
-                ( Just players, PlayerSelectionStage _ bounds _ ) ->
-                    PlayerSelectionStage players bounds schema |> toState
+                ( Just players, PlayerSelectionStage _ bounds _ aliases ) ->
+                    PlayerSelectionStage players bounds schema aliases |> toState
 
                 --                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
                 _ ->
@@ -342,13 +339,13 @@ viewWithTile model =
             DefinitionStage _ ->
                 "b-b-r | Define Tracker"
 
-            PlayerSelectionStage _ _ _ ->
+            PlayerSelectionStage _ _ _ _ ->
                 "b-b-r | Select Players"
 
             BigError _ ->
                 "b-b-r | Error"
 
-            TrackerStage schema _ _ _ ->
+            TrackerStage schema _ _ _ _ ->
                 "b-b-r | Track " ++ schema.name
     , body = [ view model ]
     }
@@ -360,15 +357,15 @@ view model =
         DefinitionStage valid ->
             viewEditTracker model.schemaJson model.url valid
 
-        TrackerStage def state turns log ->
+        TrackerStage def state turns log aliases ->
             div []
-                [ viewTracker def state turns
-                , viewLogs log
+                [ viewTracker def state turns aliases
+                , viewLogs log aliases
                 , div [] [ makeUrl "track" model.schemaJson model.url ]
                 , div [] [ makeUrl "edit" model.schemaJson model.url ]
                 ]
 
-        PlayerSelectionStage current players schema ->
+        PlayerSelectionStage current players schema aliases ->
             viewPlayerSelection current players schema
 
         BigError err ->
@@ -402,13 +399,13 @@ view model =
                 ]
 
 
-viewLogs : List Log -> Html Msg
-viewLogs entries =
-    div [] (h1 [] [ text "History" ] :: List.map viewLog entries)
+viewLogs : List Log -> PlayerAliases -> Html Msg
+viewLogs entries aliases =
+    div [] (h1 [] [ text "History" ] :: List.map (viewLog aliases) entries)
 
 
-viewLog : Log -> Html Msg
-viewLog log =
+viewLog : PlayerAliases -> Log -> Html Msg
+viewLog aliases log =
     div []
         [ case log of
             GameStarted turns ->
@@ -519,8 +516,8 @@ eval schema expr thisPlayer state currentPlayer =
     aux expr
 
 
-viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> Html TrackMsg
-viewTrackerComponent schema tracker state turns playerNumber =
+viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> PlayerAliases -> Html TrackMsg
+viewTrackerComponent schema tracker state turns playerNumber aliases =
     case tracker of
         WholeNumberSchema s ->
             div []
@@ -546,29 +543,32 @@ viewTrackerComponent schema tracker state turns playerNumber =
                 ]
 
         Group s ->
-            div [] (List.map (\i -> viewTrackerComponent schema i state turns playerNumber) s.items)
+            div [] (List.map (\i -> viewTrackerComponent schema i state turns playerNumber aliases) s.items)
 
         PlayerGroup s ->
-            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) ]) |> div []
+            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) aliases ]) |> div []
 
         Action s ->
             button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
 
 
-viewPlayerIndicator : Turns -> Int -> Html TrackMsg
-viewPlayerIndicator turns playerNumber =
-    if turns.currentPlayerTurn == playerNumber then
-        i [] [ "Player " ++ String.fromInt (playerNumber + 1) |> text ]
+viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
+viewPlayerIndicator turns playerNumber aliases =
+    let
+        playerName = Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
+    in
+      if turns.currentPlayerTurn == playerNumber then
+          i [] [ playerName |> text ]
 
-    else
-        "Player " ++ String.fromInt (playerNumber + 1) |> text
+      else
+          playerName |> text
 
 
-viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> Html Msg
-viewTracker schema state turns =
+viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> PlayerAliases -> Html Msg
+viewTracker schema state turns aliases =
     div []
         [ h1 [] [ text schema.name ]
-        , Html.map (TrackerMsg schema state turns) <| viewTrackerComponent schema schema.tracker state turns Nothing
+        , Html.map (TrackerMsg schema state turns aliases) <| viewTrackerComponent schema schema.tracker state turns Nothing aliases
         ]
 
 
@@ -658,7 +658,12 @@ type Effect
 
 playerGroupDecoder : Decoder TrackerSchema
 playerGroupDecoder =
-    Decode.map3 (\items minPlayers maxPlayers -> PlayerGroup { items = items, minPlayers = minPlayers, maxPlayers = maxPlayers }) (field "items" (Decode.list trackerSchemaDecoder)) (field "minPlayers" Decode.int) (field "maxPlayers" Decode.int)
+    Decode.map4
+        (\items minPlayers maxPlayers defaultAliases -> PlayerGroup { items = items, minPlayers = minPlayers, maxPlayers = maxPlayers, defaultAliases = Maybe.withDefault [] defaultAliases })
+        (field "items" (Decode.list trackerSchemaDecoder))
+        (field "minPlayers" Decode.int)
+        (field "maxPlayers" Decode.int)
+        (field "defaultAliases" (Decode.maybe (Decode.list Decode.string) ))
 
 
 groupDecoder : Decoder TrackerSchema
@@ -753,24 +758,26 @@ type Expression
 
 
 type TrackerSchema
-    = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int }
+    = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
     | Group { items : List TrackerSchema }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
     | Calculated { text : String, equals : Expression }
 
+newPlayerAliases : List String -> PlayerAliases
+newPlayerAliases vs = List.indexedMap Tuple.pair vs |> Dict.fromList
 
-findMinAndMaxPlayers : TrackerSchema -> List { minPlayers : Int, maxPlayers : Int }
-findMinAndMaxPlayers schema =
+findPlayerGroup : TrackerSchema -> List ( { minPlayers : Int, maxPlayers : Int }, PlayerAliases )
+findPlayerGroup schema =
     case schema of
         WholeNumberSchema s ->
             []
 
         Group s ->
-            List.concatMap findMinAndMaxPlayers s.items
+            List.concatMap findPlayerGroup s.items
 
         PlayerGroup s ->
-            { minPlayers = s.minPlayers, maxPlayers = s.maxPlayers } :: List.concatMap findMinAndMaxPlayers s.items
+            ( { minPlayers = s.minPlayers, maxPlayers = s.maxPlayers }, newPlayerAliases s.defaultAliases ) :: List.concatMap findPlayerGroup s.items
 
         Action _ ->
             []
@@ -899,6 +906,11 @@ multiPlayerDominionTracker =
         "type": "player-group",
         "minPlayers": 2,
         "maxPlayers": 4,
+        "defaultAliases": [
+           "Sir Roland",
+           "Sir Robin",
+           "Sir Reginald"
+        ],
         "items": [
           {
             "type": "number",

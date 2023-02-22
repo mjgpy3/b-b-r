@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [3/14]
+* Items [3/16]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -12,6 +12,7 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Then way to replay history (e.g. resume game) 
 ** TODO Then way to persist state locally (don't lose on refresh)
 ** TODO Then way to download history 
+** TODO Show calculated field breakdown 
 ** DONE Publish 
    CLOSED: [2023-02-21 Tue 21:59]
 ** TODO Player aliases 
@@ -24,3 +25,4 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 *** TODO Then enhance wounds with images
 ** TODO Start more complicate case 
 ** TODO Monies 
+** TODO Stronger, earlier validation 
