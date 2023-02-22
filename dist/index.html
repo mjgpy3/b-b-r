@@ -6820,10 +6820,23 @@ var $author$project$Main$actionDecoder = A3(
 var $author$project$Main$Calculated = function (a) {
 	return {$: 4, a: a};
 };
-var $author$project$Main$Add = F2(
+var $author$project$Main$Add = 0;
+var $author$project$Main$Mul = 1;
+var $author$project$Main$Op = F2(
 	function (a, b) {
 		return {$: 0, a: a, b: b};
 	});
+var $author$project$Main$Literal = function (a) {
+	return {$: 2, a: a};
+};
+var $author$project$Main$WholeNumber = $elm$core$Basics$identity;
+var $author$project$Main$literalDecoder = A2(
+	$elm$json$Json$Decode$map,
+	$author$project$Main$Literal,
+	A2(
+		$elm$json$Json$Decode$field,
+		'value',
+		A2($elm$json$Json$Decode$map, $elm$core$Basics$identity, $elm$json$Json$Decode$int)));
 var $author$project$Main$Ref = F2(
 	function (a, b) {
 		return {$: 1, a: a, b: b};
@@ -6837,39 +6850,38 @@ var $author$project$Main$refDecoder = A3(
 		$author$project$Main$cellScopeDecoder,
 		$elm$json$Json$Decode$maybe(
 			A2($elm$json$Json$Decode$field, 'scope', $elm$json$Json$Decode$string))));
+var $author$project$Main$opDecoder = function (op) {
+	return A2(
+		$elm$json$Json$Decode$map,
+		function (ops) {
+			return A2($author$project$Main$Op, op, ops);
+		},
+		A2(
+			$elm$json$Json$Decode$field,
+			'ops',
+			$elm$json$Json$Decode$list(
+				$author$project$Main$cyclic$expressionDecoder())));
+};
 var $author$project$Main$specificExpressionDecoder = function (ty) {
 	switch (ty) {
 		case 'add':
-			return $author$project$Main$cyclic$addDecoder();
+			return $author$project$Main$opDecoder(0);
+		case 'mul':
+			return $author$project$Main$opDecoder(1);
 		case 'ref':
 			return $author$project$Main$refDecoder;
+		case 'literal':
+			return $author$project$Main$literalDecoder;
 		default:
 			return $elm$json$Json$Decode$fail(ty + ' is not a valid expression type');
 	}
 };
-function $author$project$Main$cyclic$addDecoder() {
-	return A3(
-		$elm$json$Json$Decode$map2,
-		$author$project$Main$Add,
-		A2(
-			$elm$json$Json$Decode$field,
-			'op1',
-			$author$project$Main$cyclic$expressionDecoder()),
-		A2(
-			$elm$json$Json$Decode$field,
-			'op2',
-			$author$project$Main$cyclic$expressionDecoder()));
-}
 function $author$project$Main$cyclic$expressionDecoder() {
 	return A2(
 		$elm$json$Json$Decode$andThen,
 		$author$project$Main$specificExpressionDecoder,
 		A2($elm$json$Json$Decode$field, 'type', $elm$json$Json$Decode$string));
 }
-var $author$project$Main$addDecoder = $author$project$Main$cyclic$addDecoder();
-$author$project$Main$cyclic$addDecoder = function () {
-	return $author$project$Main$addDecoder;
-};
 var $author$project$Main$expressionDecoder = $author$project$Main$cyclic$expressionDecoder();
 $author$project$Main$cyclic$expressionDecoder = function () {
 	return $author$project$Main$expressionDecoder;
@@ -6884,7 +6896,6 @@ var $author$project$Main$calculatedDecoder = A3(
 	A2($elm$json$Json$Decode$field, 'text', $elm$json$Json$Decode$string),
 	A2($elm$json$Json$Decode$field, 'equals', $author$project$Main$expressionDecoder));
 var $elm$json$Json$Decode$map4 = _Json_map4;
-var $author$project$Main$WholeNumber = $elm$core$Basics$identity;
 var $author$project$Main$WholeNumberSchema = function (a) {
 	return {$: 3, a: a};
 };
@@ -8224,74 +8235,103 @@ var $author$project$Main$SetWholeNumber = F4(
 var $author$project$Main$eval = F5(
 	function (schema, expr, thisPlayer, state, currentPlayer) {
 		var aux = function (e) {
-			if (!e.$) {
-				var op1 = e.a;
-				var op2 = e.b;
-				var _v1 = _Utils_Tuple2(
-					aux(op1),
-					aux(op2));
-				if (!_v1.a.$) {
-					if (!_v1.b.$) {
-						var a = _v1.a.a;
-						var b = _v1.b.a;
-						return $elm$core$Result$Ok(a + b);
+			switch (e.$) {
+				case 0:
+					if (!e.a) {
+						var _v3 = e.a;
+						var ops = e.b;
+						return A3(
+							$elm$core$List$foldl,
+							op(
+								F2(
+									function (a, b) {
+										return a + b;
+									})),
+							$elm$core$Result$Ok(0),
+							ops);
 					} else {
-						var err = _v1.b.a;
-						return $elm$core$Result$Err(err);
+						var _v4 = e.a;
+						var ops = e.b;
+						return A3(
+							$elm$core$List$foldl,
+							op(
+								F2(
+									function (a, b) {
+										return a * b;
+									})),
+							$elm$core$Result$Ok(1),
+							ops);
 					}
-				} else {
-					var err = _v1.a.a;
-					return $elm$core$Result$Err(err);
-				}
-			} else {
-				var targetId = e.a;
-				var scope = e.b;
-				var player = function () {
-					var _v3 = _Utils_Tuple2(scope, thisPlayer);
-					switch (_v3.a) {
-						case 0:
-							var _v4 = _v3.a;
-							return $elm$core$Result$Ok($elm$core$Maybe$Nothing);
-						case 1:
-							var _v5 = _v3.a;
-							return $elm$core$Result$Ok(
-								$elm$core$Maybe$Just(currentPlayer));
-						case 2:
-							var _v6 = _v3.a;
-							return $elm$core$Result$Err('Calculated fields cannot reference all players');
-						default:
-							if (!_v3.b.$) {
-								var _v7 = _v3.a;
-								var _this = _v3.b.a;
+				case 2:
+					var v = e.a;
+					return $elm$core$Result$Ok(v);
+				default:
+					var targetId = e.a;
+					var scope = e.b;
+					var player = function () {
+						var _v6 = _Utils_Tuple2(scope, thisPlayer);
+						switch (_v6.a) {
+							case 0:
+								var _v7 = _v6.a;
+								return $elm$core$Result$Ok($elm$core$Maybe$Nothing);
+							case 1:
+								var _v8 = _v6.a;
 								return $elm$core$Result$Ok(
-									$elm$core$Maybe$Just(_this));
-							} else {
-								var _v8 = _v3.a;
-								var _v9 = _v3.b;
-								return $elm$core$Result$Err('Referenced this player, but couldn\'t find them');
-							}
+									$elm$core$Maybe$Just(currentPlayer));
+							case 2:
+								var _v9 = _v6.a;
+								return $elm$core$Result$Err('Calculated fields cannot reference all players');
+							default:
+								if (!_v6.b.$) {
+									var _v10 = _v6.a;
+									var _this = _v6.b.a;
+									return $elm$core$Result$Ok(
+										$elm$core$Maybe$Just(_this));
+								} else {
+									var _v11 = _v6.a;
+									var _v12 = _v6.b;
+									return $elm$core$Result$Err('Referenced this player, but couldn\'t find them');
+								}
+						}
+					}();
+					var _v5 = A2($author$project$Main$idDefault, targetId, schema.L);
+					if (!_v5.$) {
+						var _default = _v5.a;
+						return A2(
+							$elm$core$Result$map,
+							function (p) {
+								return A2(
+									$elm$core$Maybe$withDefault,
+									_default,
+									A2(
+										$elm$core$Dict$get,
+										A2($author$project$Main$key, targetId, p),
+										state));
+							},
+							player);
+					} else {
+						return $elm$core$Result$Err('Could not find identifier ' + (targetId + ' anywhere'));
 					}
-				}();
-				var _v2 = A2($author$project$Main$idDefault, targetId, schema.L);
-				if (!_v2.$) {
-					var _default = _v2.a;
-					return A2(
-						$elm$core$Result$map,
-						function (p) {
-							return A2(
-								$elm$core$Maybe$withDefault,
-								_default,
-								A2(
-									$elm$core$Dict$get,
-									A2($author$project$Main$key, targetId, p),
-									state));
-						},
-						player);
-				} else {
-					return $elm$core$Result$Err('Could not find identifier ' + (targetId + ' anywhere'));
-				}
 			}
 		};
+		var op = F3(
+			function (o, a, b) {
+				if (b.$ === 1) {
+					var err = b.a;
+					return $elm$core$Result$Err(err);
+				} else {
+					var v2 = b.a;
+					var _v1 = aux(a);
+					if (!_v1.$) {
+						var v1 = _v1.a;
+						return $elm$core$Result$Ok(
+							A2(o, v1, v2));
+					} else {
+						var err = _v1.a;
+						return $elm$core$Result$Err(err);
+					}
+				}
+			});
 		return aux(expr);
 	});
 var $elm$html$Html$h2 = _VirtualDom_node('h2');
