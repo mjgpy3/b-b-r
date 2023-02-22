@@ -420,7 +420,7 @@ viewLog aliases log =
                     text "Game started"
 
             ActionPerformed (Just player) action _ ->
-                text ("Player " ++ String.fromInt (player + 1) ++ " " ++ action)
+                text (playerName player aliases ++ " " ++ action)
 
             ActionPerformed Nothing action _ ->
                 text action
@@ -429,7 +429,7 @@ viewLog aliases log =
                 text (thing ++ " updated to " ++ valueToString value)
 
             ValueUpdated (Just player) thing value ->
-                text ("Player " ++ String.fromInt (player + 1) ++ "'s " ++ thing ++ " updated to " ++ valueToString value)
+                text (playerName player aliases ++ "'s " ++ thing ++ " updated to " ++ valueToString value)
         ]
 
 
@@ -555,11 +555,13 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
         Action s ->
             button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
 
+playerName : Int -> PlayerAliases -> String
+playerName playerNumber aliases =
+  Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
 
 viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
 viewPlayerIndicator turns playerNumber aliases =
     let
-        playerName = Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
         currentPlayerIndicator =
           if turns.currentPlayerTurn == playerNumber then
               style "border" "4px solid black"
@@ -568,7 +570,7 @@ viewPlayerIndicator turns playerNumber aliases =
     in
       div [currentPlayerIndicator ]
           [
-                 input [ value playerName, onInput (UpdatePlayerAlias playerNumber) ] []
+                 input [ value (playerName playerNumber aliases), onInput (UpdatePlayerAlias playerNumber) ] []
           ]
 
 viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> PlayerAliases -> Html Msg
