@@ -8211,7 +8211,7 @@ var $author$project$Main$viewLog = F2(
 						case 0:
 							var turns = log.a;
 							return (turns.i > 1) ? $elm$html$Html$text(
-								$elm$core$String$fromInt(turns.i) + (' player game started, player ' + ($elm$core$String$fromInt(turns.f + 1) + '\'s turn'))) : $elm$html$Html$text('Game started');
+								$elm$core$String$fromInt(turns.i) + (' player game started, ' + (A2($author$project$Main$playerName, turns.f, aliases) + '\'s turn'))) : $elm$html$Html$text('Game started');
 						case 1:
 							if (!log.a.$) {
 								var player = log.a.a;
