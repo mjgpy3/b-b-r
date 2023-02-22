@@ -1,0 +1,44 @@
+{
+    "name": "Dominion Turn Tracker",
+    "tracker": {
+        "type": "group",
+        "items": [
+            {
+                "type": "action",
+                "text": "Reset",
+                "effects": [
+                    {
+                        "type": "restore-default",
+                        "targetId": "a"
+                    },
+                    {
+                        "type": "restore-default",
+                        "targetId": "b"
+                    },
+                    {
+                        "type": "restore-default",
+                        "targetId": "em"
+                    }
+                ]
+            },
+            {
+                "type": "number",
+                "text": "Actions",
+                "default": 1,
+                "id": "a"
+            },
+            {
+                "type": "number",
+                "text": "Buys",
+                "default": 1,
+                "id": "b"
+            },
+            {
+                "type": "number",
+                "text": "Extra Money",
+                "default": 0,
+                "id": "em"
+            }
+        ]
+    }
+}

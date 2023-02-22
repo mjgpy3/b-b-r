@@ -1,0 +1,62 @@
+{
+  "name": "Multi-player Dominion Turn Tracker",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "action",
+        "text": "Next Turn",
+        "effects": [
+          {
+            "type": "next-turn"
+          },
+          {
+            "type": "restore-default",
+            "targetId": "a",
+            "scope": "current-player"
+          },
+          {
+            "type": "restore-default",
+            "targetId": "b",
+            "scope": "current-player"
+          },
+          {
+            "type": "restore-default",
+            "targetId": "em",
+            "scope": "current-player"
+          }
+        ]
+      },
+      {
+        "type": "player-group",
+        "minPlayers": 2,
+        "maxPlayers": 4,
+        "defaultAliases": [
+           "Sir Roland",
+           "Sir Robin",
+           "Sir Reginald"
+        ],
+        "items": [
+          {
+            "type": "number",
+            "text": "Actions",
+            "default": 1,
+            "id": "a"
+          },
+          {
+            "type": "number",
+            "text": "Buys",
+            "default": 1,
+            "id": "b"
+          },
+          {
+            "type": "number",
+            "text": "Extra Money",
+            "default": 0,
+            "id": "em"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "name": "Kill Team Tracker",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "action",
+        "text": "Next Turning Point",
+        "effects": [
+          {
+            "type": "adjust",
+            "amount": 1,
+            "targetId": "turning-point"
+          },
+          {
+            "type": "adjust",
+            "amount": 1,
+            "targetId": "command-points",
+            "scope": "all-players"
+          }
+        ]
+      },
+      {
+        "type": "number",
+        "text": "Turning Point",
+        "default": 1,
+        "disabled": true,
+        "id": "turning-point"
+      },
+      {
+        "type": "player-group",
+        "minPlayers": 2,
+        "maxPlayers": 2,
+        "items": [
+          {
+            "type": "action",
+            "text": "Has Initiative",
+            "effects": [
+              {
+                "type": "set-current-player",
+                "target": "this-player"
+              }
+            ]
+          },
+          {
+            "type": "number",
+            "text": "Command Points",
+            "default": 2,
+            "id": "command-points"
+          },
+          {
+            "type": "number",
+            "text": "Primary VP",
+            "default": 0,
+            "id": "primary-vp"
+          },
+          {
+            "type": "number",
+            "text": "Secondary VP",
+            "default": 0,
+            "id": "secondary-vp"
+          },
+          {
+            "type": "calculated",
+            "text": "Total VP",
+            "equals": {
+              "type": "add",
+              "op1": {
+                "type": "ref",
+                "targetId": "primary-vp",
+                "scope": "this-player"
+              },
+              "op2": {
+                "type": "ref",
+                "targetId": "secondary-vp",
+                "scope": "this-player"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

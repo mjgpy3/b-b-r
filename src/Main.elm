@@ -154,7 +154,6 @@ type Msg
     = UpdateDefinition String
     | MoveToPlayerSelection TrackerTopLevelSchema
     | MoveToEdit
-    | TestTracker String Turns
     | TrackerMsg TrackerTopLevelSchema TrackingState Turns PlayerAliases TrackMsg
     | SetNumberOfPlayers TrackerTopLevelSchema String
     | ConfirmNumberOfPlayers TrackerTopLevelSchema
@@ -216,18 +215,6 @@ update msg model =
 
         MoveToEdit ->
             DefinitionStage StartingOut |> toState
-
-        TestTracker def turns ->
-            case Decode.decodeString trackerTopLevelSchemaDecoder def of
-                Err e ->
-                    { schemaJson = def, url = model.url, state = InvalidDefinition e |> DefinitionStage }
-
-                Ok d ->
-                    let
-                        newModel =
-                            withLogs d Dict.empty turns [ GameStarted turns ] Dict.empty
-                    in
-                    { newModel | schemaJson = def }
 
         TrackerMsg schema state turns aliases (ApplyEffects thisPlayer action effects) ->
             case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
@@ -471,10 +458,6 @@ viewEditTracker def url valid =
             StartingOut ->
                 text ""
         , div [] [ makeUrl "edit" def url ]
-        , div [] [ h1 [] [ text "Test Trackers" ] ]
-        , div [] [ button [ onClick (TestTracker simpleDominionTracker { currentPlayerTurn = 0, playerCount = 1 }) ] [ text "Dominion turn tracker" ] ]
-        , div [] [ button [ onClick (TestTracker multiPlayerDominionTracker { currentPlayerTurn = 0, playerCount = 3 }) ] [ text "Multi-player Dominion turn tracker" ] ]
-        , div [] [ button [ onClick (TestTracker killTeamTracker { currentPlayerTurn = 0, playerCount = 2 }) ] [ text "Kill team" ] ]
         ]
 
 
@@ -836,211 +819,3 @@ type alias TrackerTopLevelSchema =
     { name : String
     , tracker : TrackerSchema
     }
-
-
-simpleDominionTracker : String
-simpleDominionTracker =
-    """
-{
-  "name": "Dominion Turn Tracker",
-  "tracker": {
-    "type": "group",
-    "items": [
-      {
-        "type": "action",
-        "text": "Reset",
-        "effects": [
-          {
-            "type": "restore-default",
-            "targetId": "a"
-          },
-          {
-            "type": "restore-default",
-            "targetId": "b"
-          },
-          {
-            "type": "restore-default",
-            "targetId": "em"
-          }
-        ]
-      },
-      {
-        "type": "number",
-        "text": "Actions",
-        "default": 1,
-        "id": "a"
-      },
-      {
-        "type": "number",
-        "text": "Buys",
-        "default": 1,
-        "id": "b"
-      },
-      {
-        "type": "number",
-        "text": "Extra Money",
-        "default": 0,
-        "id": "em"
-      }
-    ]
-  }
-}
-              """
-
-
-multiPlayerDominionTracker : String
-multiPlayerDominionTracker =
-    """
-{
-  "name": "Multi-player Dominion Turn Tracker",
-  "tracker": {
-    "type": "group",
-    "items": [
-      {
-        "type": "action",
-        "text": "Next Turn",
-        "effects": [
-          {
-            "type": "next-turn"
-          },
-          {
-            "type": "restore-default",
-            "targetId": "a",
-            "scope": "current-player"
-          },
-          {
-            "type": "restore-default",
-            "targetId": "b",
-            "scope": "current-player"
-          },
-          {
-            "type": "restore-default",
-            "targetId": "em",
-            "scope": "current-player"
-          }
-        ]
-      },
-      {
-        "type": "player-group",
-        "minPlayers": 2,
-        "maxPlayers": 4,
-        "defaultAliases": [
-           "Sir Roland",
-           "Sir Robin",
-           "Sir Reginald"
-        ],
-        "items": [
-          {
-            "type": "number",
-            "text": "Actions",
-            "default": 1,
-            "id": "a"
-          },
-          {
-            "type": "number",
-            "text": "Buys",
-            "default": 1,
-            "id": "b"
-          },
-          {
-            "type": "number",
-            "text": "Extra Money",
-            "default": 0,
-            "id": "em"
-          }
-        ]
-      }
-    ]
-  }
-}
-"""
-
-
-killTeamTracker : String
-killTeamTracker =
-    """
-{
-  "name": "Kill Team Tracker",
-  "tracker": {
-    "type": "group",
-    "items": [
-      {
-        "type": "action",
-        "text": "Next Turning Point",
-        "effects": [
-          {
-            "type": "adjust",
-            "amount": 1,
-            "targetId": "turning-point"
-          },
-          {
-            "type": "adjust",
-            "amount": 1,
-            "targetId": "command-points",
-            "scope": "all-players"
-          }
-        ]
-      },
-      {
-        "type": "number",
-        "text": "Turning Point",
-        "default": 1,
-        "disabled": true,
-        "id": "turning-point"
-      },
-      {
-        "type": "player-group",
-        "minPlayers": 2,
-        "maxPlayers": 2,
-        "items": [
-          {
-            "type": "action",
-            "text": "Has Initiative",
-            "effects": [
-              {
-                "type": "set-current-player",
-                "target": "this-player"
-              }
-            ]
-          },
-          {
-            "type": "number",
-            "text": "Command Points",
-            "default": 2,
-            "id": "command-points"
-          },
-          {
-            "type": "number",
-            "text": "Primary VP",
-            "default": 0,
-            "id": "primary-vp"
-          },
-          {
-            "type": "number",
-            "text": "Secondary VP",
-            "default": 0,
-            "id": "secondary-vp"
-          },
-          {
-            "type": "calculated",
-            "text": "Total VP",
-            "equals": {
-              "type": "add",
-              "op1": {
-                "type": "ref",
-                "targetId": "primary-vp",
-                "scope": "this-player"
-              },
-              "op2": {
-                "type": "ref",
-                "targetId": "secondary-vp",
-                "scope": "this-player"
-              }
-            }
-          }
-        ]
-      }
-    ]
-  }
-}
-"""
