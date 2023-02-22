@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Base64.Decode as Base64D
 import Base64.Encode as Base64E
+import Round as Round
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
@@ -70,6 +71,7 @@ type DefinitionValidity
 
 type Value
     = WholeNumber Int
+    | DecimalNumber Float
 
 
 valueToString : Value -> String
@@ -77,6 +79,8 @@ valueToString v =
     case v of
         WholeNumber n ->
             String.fromInt n
+        DecimalNumber n ->
+            String.fromFloat n
 
 
 type alias TrackingState =
@@ -313,6 +317,9 @@ applyEffect thisPlayer eff result =
                                         ( Adjust amount, WholeNumber v ) ->
                                             v + amount |> WholeNumber |> Ok
 
+                                        ( Adjust amount, DecimalNumber v ) ->
+                                            v + toFloat amount |> DecimalNumber |> Ok
+
                                 apply scopedKey res =
                                     res
                                         |> Result.andThen
@@ -464,15 +471,28 @@ viewEditTracker def url valid =
 eval : TrackerTopLevelSchema -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
 eval schema expr thisPlayer state currentPlayer =
     let
-        op o a b =
+        op oInt oFloat a b =
             case b of
                 Err err ->
                     Err err
 
+                Ok (DecimalNumber v2) ->
+                    case aux a of
+                        Ok (WholeNumber v1) ->
+                            Ok (DecimalNumber (oFloat (toFloat v1 ) v2))
+
+                        Ok (DecimalNumber v1) ->
+                            Ok (DecimalNumber (oFloat v1 v2))
+
+                        Err err ->
+                            Err err
+
                 Ok (WholeNumber v2) ->
                     case aux a of
                         Ok (WholeNumber v1) ->
-                            Ok (WholeNumber (o v1 v2))
+                            Ok (WholeNumber (oInt v1 v2))
+                        Ok (DecimalNumber v1) ->
+                            Ok (DecimalNumber (oFloat v1 (toFloat v2)))
 
                         Err err ->
                             Err err
@@ -480,10 +500,10 @@ eval schema expr thisPlayer state currentPlayer =
         aux e =
             case e of
                 Op Add ops ->
-                    List.foldl (op (\a b -> a + b)) (WholeNumber 0 |> Ok) ops
+                    List.foldl (op (\a b -> a + b) (\a b -> a + b)) (WholeNumber 0 |> Ok) ops
 
                 Op Mul ops ->
-                    List.foldl (op (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
+                    List.foldl (op (\a b -> a * b) (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
 
                 Literal v ->
                     Ok v
@@ -538,6 +558,9 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                 , case eval schema s.equals playerNumber state turns.currentPlayerTurn of
                     Ok (WholeNumber v) ->
                         v |> String.fromInt |> text
+
+                    Ok (DecimalNumber v) ->
+                        v |> Round.round 2 |> text
 
                     Err e ->
                         text ("Error: " ++ e)
@@ -700,7 +723,7 @@ refDecoder =
 
 literalDecoder : Decoder Expression
 literalDecoder =
-    Decode.map Literal (field "value" (Decode.map WholeNumber Decode.int))
+    Decode.map Literal (field "value" ( Decode.oneOf [ Decode.map WholeNumber Decode.int, Decode.map DecimalNumber Decode.float ] ))
 
 
 specificExpressionDecoder : String -> Decoder Expression

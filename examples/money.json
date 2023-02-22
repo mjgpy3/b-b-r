@@ -74,6 +74,50 @@
         "equals": {
           "type": "add",
           "ops": [
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 0.01 },
+                      {
+                          "type": "ref",
+                          "targetId": "pennies",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 0.05 },
+                      {
+                          "type": "ref",
+                          "targetId": "nickels",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 0.1 },
+                      {
+                          "type": "ref",
+                          "targetId": "dimes",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
+              {
+                  "type": "mul",
+                  "ops": [
+                      { "type": "literal", "value": 0.25 },
+                      {
+                          "type": "ref",
+                          "targetId": "quarters",
+                          "scope": "this-player"
+                      }
+                  ]
+              },
             {
               "type": "ref",
               "targetId": "ones",

@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [4/19]
+* Items [5/19]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -25,7 +25,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 *** TODO Way to track wounds 
 *** TODO Then enhance wounds with images
 ** TODO Start more complicate case 
-** TODO Monies 
+** DONE Monies 
+   CLOSED: [2023-02-22 Wed 00:00]
 ** TODO Stronger, earlier validation 
 ** TODO Log compaction
 ** TODO Log "before" value 
