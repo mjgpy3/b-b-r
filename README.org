@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [3/16]
+* Items [4/16]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -15,7 +15,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Show calculated field breakdown 
 ** DONE Publish 
    CLOSED: [2023-02-21 Tue 21:59]
-** TODO Player aliases 
+** DONE Player aliases 
+   CLOSED: [2023-02-21 Tue 22:43]
 ** TODO Better current player indicator 
 ** TODO Regression tests
 ** DONE Base64 URLs

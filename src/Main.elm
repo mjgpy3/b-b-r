@@ -144,6 +144,7 @@ init url =
 type TrackMsg
     = ApplyEffects (Maybe Int) String (List Effect)
     | SetWholeNumber String String (Maybe Int) String
+    | UpdatePlayerAlias Int String
 
 
 type Msg
@@ -232,6 +233,9 @@ update msg model =
 
                 Err e ->
                     BigError e |> toState
+
+        TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
+          withLogs schema state turns [] (Dict.insert playerNumber newAlias aliases )
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ _ "") ->
             model
@@ -556,13 +560,16 @@ viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
 viewPlayerIndicator turns playerNumber aliases =
     let
         playerName = Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
+        currentPlayerIndicator =
+          if turns.currentPlayerTurn == playerNumber then
+              style "border" "4px solid black"
+          else
+              style "border-left" "0px"
     in
-      if turns.currentPlayerTurn == playerNumber then
-          i [] [ playerName |> text ]
-
-      else
-          playerName |> text
-
+      div [currentPlayerIndicator ]
+          [
+                 input [ value playerName, onInput (UpdatePlayerAlias playerNumber) ] []
+          ]
 
 viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> PlayerAliases -> Html Msg
 viewTracker schema state turns aliases =
