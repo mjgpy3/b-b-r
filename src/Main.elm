@@ -672,7 +672,7 @@ playerGroupDecoder =
         (field "items" (Decode.list trackerSchemaDecoder))
         (field "minPlayers" Decode.int)
         (field "maxPlayers" Decode.int)
-        (field "defaultAliases" (Decode.maybe (Decode.list Decode.string) ))
+        (Decode.maybe (field "defaultAliases" (Decode.list Decode.string)))
 
 
 groupDecoder : Decoder TrackerSchema
