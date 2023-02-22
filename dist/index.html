@@ -4797,7 +4797,7 @@ var $elm$core$Set$toList = function (_v0) {
 	return $elm$core$Dict$keys(dict);
 };
 var $elm$core$Basics$GT = 2;
-var $author$project$Main$Noop = {$: 7};
+var $author$project$Main$Noop = {$: 6};
 var $elm$core$Result$Err = function (a) {
 	return {$: 1, a: a};
 };
@@ -5522,9 +5522,9 @@ var $elm$json$Json$Decode$decodeString = _Json_runOnString;
 var $author$project$Main$StartingOut = {$: 2};
 var $author$project$Main$init = function (url) {
 	return {
-		j: '',
-		g: $author$project$Main$DefinitionStage($author$project$Main$StartingOut),
-		e: url
+		l: '',
+		f: $author$project$Main$DefinitionStage($author$project$Main$StartingOut),
+		g: url
 	};
 };
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
@@ -7107,7 +7107,7 @@ var $author$project$Main$applyEffect = F3(
 							_Utils_update(
 								turns,
 								{
-									f: A2($elm$core$Basics$modBy, turns.i, turns.f + 1)
+									j: A2($elm$core$Basics$modBy, turns.o, turns.j + 1)
 								})));
 				case 2:
 					var _v3 = eff.a;
@@ -7119,7 +7119,7 @@ var $author$project$Main$applyEffect = F3(
 								state,
 								_Utils_update(
 									turns,
-									{f: player})));
+									{j: player})));
 					} else {
 						return $elm$core$Result$Err($author$project$Main$CannotSetCurrentPlayerToThisWithEffectsOutsideContext);
 					}
@@ -7138,7 +7138,7 @@ var $author$project$Main$applyEffect = F3(
 										A2(
 										$author$project$Main$key,
 										targetId,
-										$elm$core$Maybe$Just(turns.f))
+										$elm$core$Maybe$Just(turns.j))
 									]);
 							case 2:
 								return A2(
@@ -7149,7 +7149,7 @@ var $author$project$Main$applyEffect = F3(
 											targetId,
 											$elm$core$Maybe$Just(i));
 									},
-									A2($elm$core$List$range, 0, turns.i - 1));
+									A2($elm$core$List$range, 0, turns.o - 1));
 							default:
 								return A2(
 									$elm$core$List$map,
@@ -7159,7 +7159,7 @@ var $author$project$Main$applyEffect = F3(
 											targetId,
 											$elm$core$Maybe$Just(i));
 									},
-									A2($elm$core$List$range, 0, turns.i - 1));
+									A2($elm$core$List$range, 0, turns.o - 1));
 						}
 					}();
 					var _v5 = A2($author$project$Main$idDefault, targetId, schema.L);
@@ -7246,14 +7246,14 @@ var $author$project$Main$findPlayerGroup = function (schema) {
 var $author$project$Main$update = F2(
 	function (msg, model) {
 		var toState = function (state) {
-			return {j: model.j, g: state, e: model.e};
+			return {l: model.l, f: state, g: model.g};
 		};
 		var withLogs = F5(
 			function (schema, state, players, newLogs, aliases) {
 				var oldLogs = function () {
-					var _v15 = model.g;
-					if (_v15.$ === 3) {
-						var logs = _v15.d;
+					var _v14 = model.f;
+					if (_v14.$ === 3) {
+						var logs = _v14.d;
 						return logs;
 					} else {
 						return _List_Nil;
@@ -7269,7 +7269,7 @@ var $author$project$Main$update = F2(
 						aliases));
 			});
 		switch (msg.$) {
-			case 7:
+			case 6:
 				return model;
 			case 1:
 				var def = msg.a;
@@ -7280,7 +7280,7 @@ var $author$project$Main$update = F2(
 						var players = _v2.a;
 						var aliases = _v2.b;
 						if (_Utils_eq(players.D, players.C)) {
-							var turns = {f: 0, i: players.C};
+							var turns = {j: 0, o: players.C};
 							return A5(
 								withLogs,
 								def,
@@ -7300,7 +7300,7 @@ var $author$project$Main$update = F2(
 							$author$project$Main$BigError($author$project$Main$TooManyPlayerGroupsDefined));
 					}
 				} else {
-					var turns = {f: 0, i: 1};
+					var turns = {j: 0, o: 1};
 					return A5(
 						withLogs,
 						def,
@@ -7318,73 +7318,45 @@ var $author$project$Main$update = F2(
 				if (_v3.$ === 1) {
 					var e = _v3.a;
 					return {
-						j: def,
-						g: $author$project$Main$DefinitionStage(
+						l: def,
+						f: $author$project$Main$DefinitionStage(
 							$author$project$Main$InvalidDefinition(e)),
-						e: model.e
+						g: model.g
 					};
 				} else {
 					var d = _v3.a;
 					return {
-						j: def,
-						g: $author$project$Main$DefinitionStage(
+						l: def,
+						f: $author$project$Main$DefinitionStage(
 							$author$project$Main$ValidDefinition(d)),
-						e: model.e
+						g: model.g
 					};
 				}
 			case 2:
 				return toState(
 					$author$project$Main$DefinitionStage($author$project$Main$StartingOut));
 			case 3:
-				var def = msg.a;
-				var turns = msg.b;
-				var _v4 = A2($elm$json$Json$Decode$decodeString, $author$project$Main$trackerTopLevelSchemaDecoder, def);
-				if (_v4.$ === 1) {
-					var e = _v4.a;
-					return {
-						j: def,
-						g: $author$project$Main$DefinitionStage(
-							$author$project$Main$InvalidDefinition(e)),
-						e: model.e
-					};
-				} else {
-					var d = _v4.a;
-					var newModel = A5(
-						withLogs,
-						d,
-						$elm$core$Dict$empty,
-						turns,
-						_List_fromArray(
-							[
-								$author$project$Main$GameStarted(turns)
-							]),
-						$elm$core$Dict$empty);
-					return _Utils_update(
-						newModel,
-						{j: def});
-				}
-			case 4:
 				switch (msg.e.$) {
 					case 0:
 						var schema = msg.a;
 						var state = msg.b;
 						var turns = msg.c;
 						var aliases = msg.d;
-						var _v5 = msg.e;
-						var thisPlayer = _v5.a;
-						var action = _v5.b;
-						var effects = _v5.c;
-						var _v6 = A3(
+						var _v4 = msg.e;
+						var thisPlayer = _v4.a;
+						var action = _v4.b;
+						var effects = _v4.c;
+						var _v5 = A3(
 							$elm$core$List$foldl,
 							$author$project$Main$applyEffect(thisPlayer),
 							$elm$core$Result$Ok(
 								_Utils_Tuple3(schema, state, turns)),
 							effects);
-						if (!_v6.$) {
-							var _v7 = _v6.a;
-							var sc = _v7.a;
-							var st = _v7.b;
-							var ts = _v7.c;
+						if (!_v5.$) {
+							var _v6 = _v5.a;
+							var sc = _v6.a;
+							var st = _v6.b;
+							var ts = _v6.c;
 							return A5(
 								withLogs,
 								sc,
@@ -7396,7 +7368,7 @@ var $author$project$Main$update = F2(
 									]),
 								aliases);
 						} else {
-							var e = _v6.a;
+							var e = _v5.a;
 							return toState(
 								$author$project$Main$BigError(e));
 						}
@@ -7405,9 +7377,9 @@ var $author$project$Main$update = F2(
 						var state = msg.b;
 						var turns = msg.c;
 						var aliases = msg.d;
-						var _v8 = msg.e;
-						var playerNumber = _v8.a;
-						var newAlias = _v8.b;
+						var _v7 = msg.e;
+						var playerNumber = _v7.a;
+						var newAlias = _v7.b;
 						return A5(
 							withLogs,
 							schema,
@@ -7417,21 +7389,21 @@ var $author$project$Main$update = F2(
 							A3($elm$core$Dict$insert, playerNumber, newAlias, aliases));
 					default:
 						if (msg.e.d === '') {
-							var _v9 = msg.e;
+							var _v8 = msg.e;
 							return model;
 						} else {
 							var schema = msg.a;
 							var state = msg.b;
 							var turns = msg.c;
 							var aliases = msg.d;
-							var _v10 = msg.e;
-							var id = _v10.a;
-							var field = _v10.b;
-							var player = _v10.c;
-							var rawValue = _v10.d;
-							var _v11 = $elm$core$String$toInt(rawValue);
-							if (!_v11.$) {
-								var v = _v11.a;
+							var _v9 = msg.e;
+							var id = _v9.a;
+							var field = _v9.b;
+							var player = _v9.c;
+							var rawValue = _v9.d;
+							var _v10 = $elm$core$String$toInt(rawValue);
+							if (!_v10.$) {
+								var v = _v10.a;
 								var num = v;
 								return A5(
 									withLogs,
@@ -7454,14 +7426,14 @@ var $author$project$Main$update = F2(
 							}
 						}
 				}
-			case 6:
+			case 5:
 				var schema = msg.a;
-				var _v12 = model.g;
-				if (_v12.$ === 1) {
-					var players = _v12.a;
-					var bounds = _v12.b;
-					var aliases = _v12.d;
-					var turns = {f: 0, i: players};
+				var _v11 = model.f;
+				if (_v11.$ === 1) {
+					var players = _v11.a;
+					var bounds = _v11.b;
+					var aliases = _v11.d;
+					var turns = {j: 0, o: players};
 					return A5(
 						withLogs,
 						schema,
@@ -7482,14 +7454,14 @@ var $author$project$Main$update = F2(
 				} else {
 					var schema = msg.a;
 					var n = msg.b;
-					var _v13 = _Utils_Tuple2(
+					var _v12 = _Utils_Tuple2(
 						$elm$core$String$toInt(n),
-						model.g);
-					if ((!_v13.a.$) && (_v13.b.$ === 1)) {
-						var players = _v13.a.a;
-						var _v14 = _v13.b;
-						var bounds = _v14.b;
-						var aliases = _v14.d;
+						model.f);
+					if ((!_v12.a.$) && (_v12.b.$ === 1)) {
+						var players = _v12.a.a;
+						var _v13 = _v12.b;
+						var bounds = _v13.b;
+						var aliases = _v13.d;
 						return toState(
 							A4($author$project$Main$PlayerSelectionStage, players, bounds, schema, aliases));
 					} else {
@@ -7544,10 +7516,10 @@ var $author$project$Main$initApp = F2(
 					var e = _v3.a;
 					return _Utils_Tuple2(
 						{
-							j: schema,
-							g: $author$project$Main$DefinitionStage(
+							l: schema,
+							f: $author$project$Main$DefinitionStage(
 								$author$project$Main$InvalidDefinition(e)),
-							e: url
+							g: url
 						},
 						$elm$core$Platform$Cmd$none);
 				} else {
@@ -7557,9 +7529,9 @@ var $author$project$Main$initApp = F2(
 							$author$project$Main$update,
 							$author$project$Main$MoveToPlayerSelection(d),
 							{
-								j: schema,
-								g: $author$project$Main$init(url).g,
-								e: url
+								l: schema,
+								f: $author$project$Main$init(url).f,
+								g: url
 							}),
 						$elm$core$Platform$Cmd$none);
 				}
@@ -7966,18 +7938,12 @@ var $elm$html$Html$Events$onClick = function (msg) {
 		'click',
 		$elm$json$Json$Decode$succeed(msg));
 };
-var $author$project$Main$TestTracker = F2(
-	function (a, b) {
-		return {$: 3, a: a, b: b};
-	});
 var $elm$html$Html$Attributes$cols = function (n) {
 	return A2(
 		_VirtualDom_attribute,
 		'cols',
 		$elm$core$String$fromInt(n));
 };
-var $author$project$Main$killTeamTracker = '\n{\n  "name": "Kill Team Tracker",\n  "tracker": {\n    "type": "group",\n    "items": [\n      {\n        "type": "action",\n        "text": "Next Turning Point",\n        "effects": [\n          {\n            "type": "adjust",\n            "amount": 1,\n            "targetId": "turning-point"\n          },\n          {\n            "type": "adjust",\n            "amount": 1,\n            "targetId": "command-points",\n            "scope": "all-players"\n          }\n        ]\n      },\n      {\n        "type": "number",\n        "text": "Turning Point",\n        "default": 1,\n        "disabled": true,\n        "id": "turning-point"\n      },\n      {\n        "type": "player-group",\n        "minPlayers": 2,\n        "maxPlayers": 2,\n        "items": [\n          {\n            "type": "action",\n            "text": "Has Initiative",\n            "effects": [\n              {\n                "type": "set-current-player",\n                "target": "this-player"\n              }\n            ]\n          },\n          {\n            "type": "number",\n            "text": "Command Points",\n            "default": 2,\n            "id": "command-points"\n          },\n          {\n            "type": "number",\n            "text": "Primary VP",\n            "default": 0,\n            "id": "primary-vp"\n          },\n          {\n            "type": "number",\n            "text": "Secondary VP",\n            "default": 0,\n            "id": "secondary-vp"\n          },\n          {\n            "type": "calculated",\n            "text": "Total VP",\n            "equals": {\n              "type": "add",\n              "op1": {\n                "type": "ref",\n                "targetId": "primary-vp",\n                "scope": "this-player"\n              },\n              "op2": {\n                "type": "ref",\n                "targetId": "secondary-vp",\n                "scope": "this-player"\n              }\n            }\n          }\n        ]\n      }\n    ]\n  }\n}\n';
-var $author$project$Main$multiPlayerDominionTracker = '\n{\n  "name": "Multi-player Dominion Turn Tracker",\n  "tracker": {\n    "type": "group",\n    "items": [\n      {\n        "type": "action",\n        "text": "Next Turn",\n        "effects": [\n          {\n            "type": "next-turn"\n          },\n          {\n            "type": "restore-default",\n            "targetId": "a",\n            "scope": "current-player"\n          },\n          {\n            "type": "restore-default",\n            "targetId": "b",\n            "scope": "current-player"\n          },\n          {\n            "type": "restore-default",\n            "targetId": "em",\n            "scope": "current-player"\n          }\n        ]\n      },\n      {\n        "type": "player-group",\n        "minPlayers": 2,\n        "maxPlayers": 4,\n        "defaultAliases": [\n           "Sir Roland",\n           "Sir Robin",\n           "Sir Reginald"\n        ],\n        "items": [\n          {\n            "type": "number",\n            "text": "Actions",\n            "default": 1,\n            "id": "a"\n          },\n          {\n            "type": "number",\n            "text": "Buys",\n            "default": 1,\n            "id": "b"\n          },\n          {\n            "type": "number",\n            "text": "Extra Money",\n            "default": 0,\n            "id": "em"\n          }\n        ]\n      }\n    ]\n  }\n}\n';
 var $elm$html$Html$Events$alwaysStop = function (x) {
 	return _Utils_Tuple2(x, true);
 };
@@ -8017,7 +7983,6 @@ var $elm$html$Html$Attributes$rows = function (n) {
 		'rows',
 		$elm$core$String$fromInt(n));
 };
-var $author$project$Main$simpleDominionTracker = '\n{\n  "name": "Dominion Turn Tracker",\n  "tracker": {\n    "type": "group",\n    "items": [\n      {\n        "type": "action",\n        "text": "Reset",\n        "effects": [\n          {\n            "type": "restore-default",\n            "targetId": "a"\n          },\n          {\n            "type": "restore-default",\n            "targetId": "b"\n          },\n          {\n            "type": "restore-default",\n            "targetId": "em"\n          }\n        ]\n      },\n      {\n        "type": "number",\n        "text": "Actions",\n        "default": 1,\n        "id": "a"\n      },\n      {\n        "type": "number",\n        "text": "Buys",\n        "default": 1,\n        "id": "b"\n      },\n      {\n        "type": "number",\n        "text": "Extra Money",\n        "default": 0,\n        "id": "em"\n      }\n    ]\n  }\n}\n              ';
 var $elm$html$Html$textarea = _VirtualDom_node('textarea');
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
 var $author$project$Main$viewEditTracker = F3(
@@ -8112,79 +8077,6 @@ var $author$project$Main$viewEditTracker = F3(
 					_List_fromArray(
 						[
 							A3($author$project$Main$makeUrl, 'edit', def, url)
-						])),
-					A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							A2(
-							$elm$html$Html$h1,
-							_List_Nil,
-							_List_fromArray(
-								[
-									$elm$html$Html$text('Test Trackers')
-								]))
-						])),
-					A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							A2(
-							$elm$html$Html$button,
-							_List_fromArray(
-								[
-									$elm$html$Html$Events$onClick(
-									A2(
-										$author$project$Main$TestTracker,
-										$author$project$Main$simpleDominionTracker,
-										{f: 0, i: 1}))
-								]),
-							_List_fromArray(
-								[
-									$elm$html$Html$text('Dominion turn tracker')
-								]))
-						])),
-					A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							A2(
-							$elm$html$Html$button,
-							_List_fromArray(
-								[
-									$elm$html$Html$Events$onClick(
-									A2(
-										$author$project$Main$TestTracker,
-										$author$project$Main$multiPlayerDominionTracker,
-										{f: 0, i: 3}))
-								]),
-							_List_fromArray(
-								[
-									$elm$html$Html$text('Multi-player Dominion turn tracker')
-								]))
-						])),
-					A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							A2(
-							$elm$html$Html$button,
-							_List_fromArray(
-								[
-									$elm$html$Html$Events$onClick(
-									A2(
-										$author$project$Main$TestTracker,
-										$author$project$Main$killTeamTracker,
-										{f: 0, i: 2}))
-								]),
-							_List_fromArray(
-								[
-									$elm$html$Html$text('Kill team')
-								]))
 						]))
 				]));
 	});
@@ -8210,8 +8102,8 @@ var $author$project$Main$viewLog = F2(
 					switch (log.$) {
 						case 0:
 							var turns = log.a;
-							return (turns.i > 1) ? $elm$html$Html$text(
-								$elm$core$String$fromInt(turns.i) + (' player game started, ' + (A2($author$project$Main$playerName, turns.f, aliases) + '\'s turn'))) : $elm$html$Html$text('Game started');
+							return (turns.o > 1) ? $elm$html$Html$text(
+								$elm$core$String$fromInt(turns.o) + (' player game started, ' + (A2($author$project$Main$playerName, turns.j, aliases) + '\'s turn'))) : $elm$html$Html$text('Game started');
 						case 1:
 							if (!log.a.$) {
 								var player = log.a.a;
@@ -8261,11 +8153,11 @@ var $author$project$Main$viewLogs = F2(
 					entries)));
 	});
 var $author$project$Main$ConfirmNumberOfPlayers = function (a) {
-	return {$: 6, a: a};
+	return {$: 5, a: a};
 };
 var $author$project$Main$SetNumberOfPlayers = F2(
 	function (a, b) {
-		return {$: 5, a: a, b: b};
+		return {$: 4, a: a, b: b};
 	});
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$html$Html$Attributes$max = $elm$html$Html$Attributes$stringProperty('max');
@@ -8317,7 +8209,7 @@ var $author$project$Main$viewPlayerSelection = F3(
 	});
 var $author$project$Main$TrackerMsg = F5(
 	function (a, b, c, d, e) {
-		return {$: 4, a: a, b: b, c: c, d: d, e: e};
+		return {$: 3, a: a, b: b, c: c, d: d, e: e};
 	});
 var $elm$virtual_dom$VirtualDom$map = _VirtualDom_map;
 var $elm$html$Html$map = $elm$virtual_dom$VirtualDom$map;
@@ -8411,7 +8303,7 @@ var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
 var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
 var $author$project$Main$viewPlayerIndicator = F3(
 	function (turns, playerNumber, aliases) {
-		var currentPlayerIndicator = _Utils_eq(turns.f, playerNumber) ? A2($elm$html$Html$Attributes$style, 'border', '4px solid black') : A2($elm$html$Html$Attributes$style, 'border-left', '0px');
+		var currentPlayerIndicator = _Utils_eq(turns.j, playerNumber) ? A2($elm$html$Html$Attributes$style, 'border', '4px solid black') : A2($elm$html$Html$Attributes$style, 'border-left', '0px');
 		return A2(
 			$elm$html$Html$div,
 			_List_fromArray(
@@ -8479,7 +8371,7 @@ var $author$project$Main$viewTrackerComponent = F6(
 							$elm$html$Html$text(s.v),
 							$elm$html$Html$text(' '),
 							function () {
-							var _v1 = A5($author$project$Main$eval, schema, s.ac, playerNumber, state, turns.f);
+							var _v1 = A5($author$project$Main$eval, schema, s.ac, playerNumber, state, turns.j);
 							if (!_v1.$) {
 								var v = _v1.a;
 								return $elm$html$Html$text(
@@ -8532,7 +8424,7 @@ var $author$project$Main$viewTrackerComponent = F6(
 										aliases)
 									]));
 						},
-						A2($elm$core$List$range, 0, turns.i - 1)));
+						A2($elm$core$List$range, 0, turns.o - 1)));
 			default:
 				var s = tracker.a;
 				return A2(
@@ -8569,11 +8461,11 @@ var $author$project$Main$viewTracker = F4(
 				]));
 	});
 var $author$project$Main$view = function (model) {
-	var _v0 = model.g;
+	var _v0 = model.f;
 	switch (_v0.$) {
 		case 0:
 			var valid = _v0.a;
-			return A3($author$project$Main$viewEditTracker, model.j, model.e, valid);
+			return A3($author$project$Main$viewEditTracker, model.l, model.g, valid);
 		case 3:
 			var def = _v0.a;
 			var state = _v0.b;
@@ -8592,14 +8484,14 @@ var $author$project$Main$view = function (model) {
 						_List_Nil,
 						_List_fromArray(
 							[
-								A3($author$project$Main$makeUrl, 'track', model.j, model.e)
+								A3($author$project$Main$makeUrl, 'track', model.l, model.g)
 							])),
 						A2(
 						$elm$html$Html$div,
 						_List_Nil,
 						_List_fromArray(
 							[
-								A3($author$project$Main$makeUrl, 'edit', model.j, model.e)
+								A3($author$project$Main$makeUrl, 'edit', model.l, model.g)
 							]))
 					]));
 		case 1:
@@ -8674,7 +8566,7 @@ var $author$project$Main$viewWithTile = function (model) {
 				$author$project$Main$view(model)
 			]),
 		aV: function () {
-			var _v0 = model.g;
+			var _v0 = model.f;
 			switch (_v0.$) {
 				case 0:
 					return 'b-b-r | Define Tracker';
