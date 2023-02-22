@@ -6826,17 +6826,28 @@ var $author$project$Main$Op = F2(
 	function (a, b) {
 		return {$: 0, a: a, b: b};
 	});
+var $author$project$Main$DecimalNumber = function (a) {
+	return {$: 1, a: a};
+};
 var $author$project$Main$Literal = function (a) {
 	return {$: 2, a: a};
 };
-var $author$project$Main$WholeNumber = $elm$core$Basics$identity;
+var $author$project$Main$WholeNumber = function (a) {
+	return {$: 0, a: a};
+};
+var $elm$json$Json$Decode$float = _Json_decodeFloat;
 var $author$project$Main$literalDecoder = A2(
 	$elm$json$Json$Decode$map,
 	$author$project$Main$Literal,
 	A2(
 		$elm$json$Json$Decode$field,
 		'value',
-		A2($elm$json$Json$Decode$map, $elm$core$Basics$identity, $elm$json$Json$Decode$int)));
+		$elm$json$Json$Decode$oneOf(
+			_List_fromArray(
+				[
+					A2($elm$json$Json$Decode$map, $author$project$Main$WholeNumber, $elm$json$Json$Decode$int),
+					A2($elm$json$Json$Decode$map, $author$project$Main$DecimalNumber, $elm$json$Json$Decode$float)
+				]))));
 var $author$project$Main$Ref = F2(
 	function (a, b) {
 		return {$: 1, a: a, b: b};
@@ -6918,7 +6929,7 @@ var $author$project$Main$wholeNumberDecoder = A5(
 	A2(
 		$elm$json$Json$Decode$field,
 		'default',
-		A2($elm$json$Json$Decode$map, $elm$core$Basics$identity, $elm$json$Json$Decode$int)),
+		A2($elm$json$Json$Decode$map, $author$project$Main$WholeNumber, $elm$json$Json$Decode$int)),
 	A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$string),
 	$elm$json$Json$Decode$maybe(
 		A2($elm$json$Json$Decode$field, 'disabled', $elm$json$Json$Decode$bool)));
@@ -7182,9 +7193,17 @@ var $author$project$Main$applyEffect = F3(
 								var _v8 = _v7.a;
 								return $elm$core$Result$Ok(_default);
 							} else {
-								var amount = _v7.a.a;
-								var v = _v7.b;
-								return $elm$core$Result$Ok(v + amount);
+								if (!_v7.b.$) {
+									var amount = _v7.a.a;
+									var v = _v7.b.a;
+									return $elm$core$Result$Ok(
+										$author$project$Main$WholeNumber(v + amount));
+								} else {
+									var amount = _v7.a.a;
+									var v = _v7.b.a;
+									return $elm$core$Result$Ok(
+										$author$project$Main$DecimalNumber(v + amount));
+								}
 							}
 						};
 						var apply = F2(
@@ -7415,7 +7434,7 @@ var $author$project$Main$update = F2(
 							var _v10 = $elm$core$String$toInt(rawValue);
 							if (!_v10.$) {
 								var v = _v10.a;
-								var num = v;
+								var num = $author$project$Main$WholeNumber(v);
 								return A5(
 									withLogs,
 									schema,
@@ -8098,9 +8117,15 @@ var $author$project$Main$playerName = F2(
 			'Player ' + $elm$core$String$fromInt(playerNumber + 1),
 			A2($elm$core$Dict$get, playerNumber, aliases));
 	});
+var $elm$core$String$fromFloat = _String_fromNumber;
 var $author$project$Main$valueToString = function (v) {
-	var n = v;
-	return $elm$core$String$fromInt(n);
+	if (!v.$) {
+		var n = v.a;
+		return $elm$core$String$fromInt(n);
+	} else {
+		var n = v.a;
+		return $elm$core$String$fromFloat(n);
+	}
 };
 var $author$project$Main$viewLog = F2(
 	function (aliases, log) {
@@ -8238,28 +8263,40 @@ var $author$project$Main$eval = F5(
 			switch (e.$) {
 				case 0:
 					if (!e.a) {
-						var _v3 = e.a;
-						var ops = e.b;
-						return A3(
-							$elm$core$List$foldl,
-							op(
-								F2(
-									function (a, b) {
-										return a + b;
-									})),
-							$elm$core$Result$Ok(0),
-							ops);
-					} else {
 						var _v4 = e.a;
 						var ops = e.b;
 						return A3(
 							$elm$core$List$foldl,
-							op(
+							A2(
+								op,
+								F2(
+									function (a, b) {
+										return a + b;
+									}),
+								F2(
+									function (a, b) {
+										return a + b;
+									})),
+							$elm$core$Result$Ok(
+								$author$project$Main$WholeNumber(0)),
+							ops);
+					} else {
+						var _v5 = e.a;
+						var ops = e.b;
+						return A3(
+							$elm$core$List$foldl,
+							A2(
+								op,
+								F2(
+									function (a, b) {
+										return a * b;
+									}),
 								F2(
 									function (a, b) {
 										return a * b;
 									})),
-							$elm$core$Result$Ok(1),
+							$elm$core$Result$Ok(
+								$author$project$Main$WholeNumber(1)),
 							ops);
 					}
 				case 2:
@@ -8269,34 +8306,34 @@ var $author$project$Main$eval = F5(
 					var targetId = e.a;
 					var scope = e.b;
 					var player = function () {
-						var _v6 = _Utils_Tuple2(scope, thisPlayer);
-						switch (_v6.a) {
+						var _v7 = _Utils_Tuple2(scope, thisPlayer);
+						switch (_v7.a) {
 							case 0:
-								var _v7 = _v6.a;
+								var _v8 = _v7.a;
 								return $elm$core$Result$Ok($elm$core$Maybe$Nothing);
 							case 1:
-								var _v8 = _v6.a;
+								var _v9 = _v7.a;
 								return $elm$core$Result$Ok(
 									$elm$core$Maybe$Just(currentPlayer));
 							case 2:
-								var _v9 = _v6.a;
+								var _v10 = _v7.a;
 								return $elm$core$Result$Err('Calculated fields cannot reference all players');
 							default:
-								if (!_v6.b.$) {
-									var _v10 = _v6.a;
-									var _this = _v6.b.a;
+								if (!_v7.b.$) {
+									var _v11 = _v7.a;
+									var _this = _v7.b.a;
 									return $elm$core$Result$Ok(
 										$elm$core$Maybe$Just(_this));
 								} else {
-									var _v11 = _v6.a;
-									var _v12 = _v6.b;
+									var _v12 = _v7.a;
+									var _v13 = _v7.b;
 									return $elm$core$Result$Err('Referenced this player, but couldn\'t find them');
 								}
 						}
 					}();
-					var _v5 = A2($author$project$Main$idDefault, targetId, schema.L);
-					if (!_v5.$) {
-						var _default = _v5.a;
+					var _v6 = A2($author$project$Main$idDefault, targetId, schema.L);
+					if (!_v6.$) {
+						var _default = _v6.a;
 						return A2(
 							$elm$core$Result$map,
 							function (p) {
@@ -8314,27 +8351,298 @@ var $author$project$Main$eval = F5(
 					}
 			}
 		};
-		var op = F3(
-			function (o, a, b) {
+		var op = F4(
+			function (oInt, oFloat, a, b) {
 				if (b.$ === 1) {
 					var err = b.a;
 					return $elm$core$Result$Err(err);
 				} else {
-					var v2 = b.a;
-					var _v1 = aux(a);
-					if (!_v1.$) {
-						var v1 = _v1.a;
-						return $elm$core$Result$Ok(
-							A2(o, v1, v2));
+					if (b.a.$ === 1) {
+						var v2 = b.a.a;
+						var _v1 = aux(a);
+						if (!_v1.$) {
+							if (!_v1.a.$) {
+								var v1 = _v1.a.a;
+								return $elm$core$Result$Ok(
+									$author$project$Main$DecimalNumber(
+										A2(oFloat, v1, v2)));
+							} else {
+								var v1 = _v1.a.a;
+								return $elm$core$Result$Ok(
+									$author$project$Main$DecimalNumber(
+										A2(oFloat, v1, v2)));
+							}
+						} else {
+							var err = _v1.a;
+							return $elm$core$Result$Err(err);
+						}
 					} else {
-						var err = _v1.a;
-						return $elm$core$Result$Err(err);
+						var v2 = b.a.a;
+						var _v2 = aux(a);
+						if (!_v2.$) {
+							if (!_v2.a.$) {
+								var v1 = _v2.a.a;
+								return $elm$core$Result$Ok(
+									$author$project$Main$WholeNumber(
+										A2(oInt, v1, v2)));
+							} else {
+								var v1 = _v2.a.a;
+								return $elm$core$Result$Ok(
+									$author$project$Main$DecimalNumber(
+										A2(oFloat, v1, v2)));
+							}
+						} else {
+							var err = _v2.a;
+							return $elm$core$Result$Err(err);
+						}
 					}
 				}
 			});
 		return aux(expr);
 	});
 var $elm$html$Html$h2 = _VirtualDom_node('h2');
+var $elm$core$Basics$ge = _Utils_ge;
+var $elm$core$Basics$not = _Basics_not;
+var $elm$core$Basics$abs = function (n) {
+	return (n < 0) ? (-n) : n;
+};
+var $elm$core$List$any = F2(
+	function (isOkay, list) {
+		any:
+		while (true) {
+			if (!list.b) {
+				return false;
+			} else {
+				var x = list.a;
+				var xs = list.b;
+				if (isOkay(x)) {
+					return true;
+				} else {
+					var $temp$isOkay = isOkay,
+						$temp$list = xs;
+					isOkay = $temp$isOkay;
+					list = $temp$list;
+					continue any;
+				}
+			}
+		}
+	});
+var $elm$core$Basics$neq = _Utils_notEqual;
+var $elm$core$String$foldr = _String_foldr;
+var $elm$core$String$toList = function (string) {
+	return A3($elm$core$String$foldr, $elm$core$List$cons, _List_Nil, string);
+};
+var $myrho$elm_round$Round$addSign = F2(
+	function (signed, str) {
+		var isNotZero = A2(
+			$elm$core$List$any,
+			function (c) {
+				return (c !== '0') && (c !== '.');
+			},
+			$elm$core$String$toList(str));
+		return _Utils_ap(
+			(signed && isNotZero) ? '-' : '',
+			str);
+	});
+var $elm$core$Char$fromCode = _Char_fromCode;
+var $myrho$elm_round$Round$increaseNum = function (_v0) {
+	var head = _v0.a;
+	var tail = _v0.b;
+	if (head === '9') {
+		var _v1 = $elm$core$String$uncons(tail);
+		if (_v1.$ === 1) {
+			return '01';
+		} else {
+			var headtail = _v1.a;
+			return A2(
+				$elm$core$String$cons,
+				'0',
+				$myrho$elm_round$Round$increaseNum(headtail));
+		}
+	} else {
+		var c = $elm$core$Char$toCode(head);
+		return ((c >= 48) && (c < 57)) ? A2(
+			$elm$core$String$cons,
+			$elm$core$Char$fromCode(c + 1),
+			tail) : '0';
+	}
+};
+var $elm$core$Basics$isInfinite = _Basics_isInfinite;
+var $elm$core$Basics$isNaN = _Basics_isNaN;
+var $elm$core$Bitwise$shiftRightBy = _Bitwise_shiftRightBy;
+var $elm$core$String$repeatHelp = F3(
+	function (n, chunk, result) {
+		return (n <= 0) ? result : A3(
+			$elm$core$String$repeatHelp,
+			n >> 1,
+			_Utils_ap(chunk, chunk),
+			(!(n & 1)) ? result : _Utils_ap(result, chunk));
+	});
+var $elm$core$String$repeat = F2(
+	function (n, chunk) {
+		return A3($elm$core$String$repeatHelp, n, chunk, '');
+	});
+var $elm$core$String$padRight = F3(
+	function (n, _char, string) {
+		return _Utils_ap(
+			string,
+			A2(
+				$elm$core$String$repeat,
+				n - $elm$core$String$length(string),
+				$elm$core$String$fromChar(_char)));
+	});
+var $elm$core$String$reverse = _String_reverse;
+var $myrho$elm_round$Round$splitComma = function (str) {
+	var _v0 = A2($elm$core$String$split, '.', str);
+	if (_v0.b) {
+		if (_v0.b.b) {
+			var before = _v0.a;
+			var _v1 = _v0.b;
+			var after = _v1.a;
+			return _Utils_Tuple2(before, after);
+		} else {
+			var before = _v0.a;
+			return _Utils_Tuple2(before, '0');
+		}
+	} else {
+		return _Utils_Tuple2('0', '0');
+	}
+};
+var $elm$core$Tuple$mapFirst = F2(
+	function (func, _v0) {
+		var x = _v0.a;
+		var y = _v0.b;
+		return _Utils_Tuple2(
+			func(x),
+			y);
+	});
+var $myrho$elm_round$Round$toDecimal = function (fl) {
+	var _v0 = A2(
+		$elm$core$String$split,
+		'e',
+		$elm$core$String$fromFloat(
+			$elm$core$Basics$abs(fl)));
+	if (_v0.b) {
+		if (_v0.b.b) {
+			var num = _v0.a;
+			var _v1 = _v0.b;
+			var exp = _v1.a;
+			var e = A2(
+				$elm$core$Maybe$withDefault,
+				0,
+				$elm$core$String$toInt(
+					A2($elm$core$String$startsWith, '+', exp) ? A2($elm$core$String$dropLeft, 1, exp) : exp));
+			var _v2 = $myrho$elm_round$Round$splitComma(num);
+			var before = _v2.a;
+			var after = _v2.b;
+			var total = _Utils_ap(before, after);
+			var zeroed = (e < 0) ? A2(
+				$elm$core$Maybe$withDefault,
+				'0',
+				A2(
+					$elm$core$Maybe$map,
+					function (_v3) {
+						var a = _v3.a;
+						var b = _v3.b;
+						return a + ('.' + b);
+					},
+					A2(
+						$elm$core$Maybe$map,
+						$elm$core$Tuple$mapFirst($elm$core$String$fromChar),
+						$elm$core$String$uncons(
+							_Utils_ap(
+								A2(
+									$elm$core$String$repeat,
+									$elm$core$Basics$abs(e),
+									'0'),
+								total))))) : A3($elm$core$String$padRight, e + 1, '0', total);
+			return _Utils_ap(
+				(fl < 0) ? '-' : '',
+				zeroed);
+		} else {
+			var num = _v0.a;
+			return _Utils_ap(
+				(fl < 0) ? '-' : '',
+				num);
+		}
+	} else {
+		return '';
+	}
+};
+var $myrho$elm_round$Round$roundFun = F3(
+	function (functor, s, fl) {
+		if ($elm$core$Basics$isInfinite(fl) || $elm$core$Basics$isNaN(fl)) {
+			return $elm$core$String$fromFloat(fl);
+		} else {
+			var signed = fl < 0;
+			var _v0 = $myrho$elm_round$Round$splitComma(
+				$myrho$elm_round$Round$toDecimal(
+					$elm$core$Basics$abs(fl)));
+			var before = _v0.a;
+			var after = _v0.b;
+			var r = $elm$core$String$length(before) + s;
+			var normalized = _Utils_ap(
+				A2($elm$core$String$repeat, (-r) + 1, '0'),
+				A3(
+					$elm$core$String$padRight,
+					r,
+					'0',
+					_Utils_ap(before, after)));
+			var totalLen = $elm$core$String$length(normalized);
+			var roundDigitIndex = A2($elm$core$Basics$max, 1, r);
+			var increase = A2(
+				functor,
+				signed,
+				A3($elm$core$String$slice, roundDigitIndex, totalLen, normalized));
+			var remains = A3($elm$core$String$slice, 0, roundDigitIndex, normalized);
+			var num = increase ? $elm$core$String$reverse(
+				A2(
+					$elm$core$Maybe$withDefault,
+					'1',
+					A2(
+						$elm$core$Maybe$map,
+						$myrho$elm_round$Round$increaseNum,
+						$elm$core$String$uncons(
+							$elm$core$String$reverse(remains))))) : remains;
+			var numLen = $elm$core$String$length(num);
+			var numZeroed = (num === '0') ? num : ((s <= 0) ? _Utils_ap(
+				num,
+				A2(
+					$elm$core$String$repeat,
+					$elm$core$Basics$abs(s),
+					'0')) : ((_Utils_cmp(
+				s,
+				$elm$core$String$length(after)) < 0) ? (A3($elm$core$String$slice, 0, numLen - s, num) + ('.' + A3($elm$core$String$slice, numLen - s, numLen, num))) : _Utils_ap(
+				before + '.',
+				A3($elm$core$String$padRight, s, '0', after))));
+			return A2($myrho$elm_round$Round$addSign, signed, numZeroed);
+		}
+	});
+var $myrho$elm_round$Round$round = $myrho$elm_round$Round$roundFun(
+	F2(
+		function (signed, str) {
+			var _v0 = $elm$core$String$uncons(str);
+			if (_v0.$ === 1) {
+				return false;
+			} else {
+				if ('5' === _v0.a.a) {
+					if (_v0.a.b === '') {
+						var _v1 = _v0.a;
+						return !signed;
+					} else {
+						var _v2 = _v0.a;
+						return true;
+					}
+				} else {
+					var _v3 = _v0.a;
+					var _int = _v3.a;
+					return function (i) {
+						return ((i > 53) && signed) || ((i >= 53) && (!signed));
+					}(
+						$elm$core$Char$toCode(_int));
+				}
+			}
+		}));
 var $author$project$Main$UpdatePlayerAlias = F2(
 	function (a, b) {
 		return {$: 2, a: a, b: b};
@@ -8413,9 +8721,15 @@ var $author$project$Main$viewTrackerComponent = F6(
 							function () {
 							var _v1 = A5($author$project$Main$eval, schema, s.ac, playerNumber, state, turns.j);
 							if (!_v1.$) {
-								var v = _v1.a;
-								return $elm$html$Html$text(
-									$elm$core$String$fromInt(v));
+								if (!_v1.a.$) {
+									var v = _v1.a.a;
+									return $elm$html$Html$text(
+										$elm$core$String$fromInt(v));
+								} else {
+									var v = _v1.a.a;
+									return $elm$html$Html$text(
+										A2($myrho$elm_round$Round$round, 2, v));
+								}
 							} else {
 								var e = _v1.a;
 								return $elm$html$Html$text('Error: ' + e);
