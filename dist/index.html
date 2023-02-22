@@ -8188,6 +8188,13 @@ var $author$project$Main$viewEditTracker = F3(
 						]))
 				]));
 	});
+var $author$project$Main$playerName = F2(
+	function (playerNumber, aliases) {
+		return A2(
+			$elm$core$Maybe$withDefault,
+			'Player ' + $elm$core$String$fromInt(playerNumber + 1),
+			A2($elm$core$Dict$get, playerNumber, aliases));
+	});
 var $author$project$Main$valueToString = function (v) {
 	var n = v;
 	return $elm$core$String$fromInt(n);
@@ -8210,7 +8217,7 @@ var $author$project$Main$viewLog = F2(
 								var player = log.a.a;
 								var action = log.b;
 								return $elm$html$Html$text(
-									'Player ' + ($elm$core$String$fromInt(player + 1) + (' ' + action)));
+									A2($author$project$Main$playerName, player, aliases) + (' ' + action));
 							} else {
 								var _v1 = log.a;
 								var action = log.b;
@@ -8228,7 +8235,7 @@ var $author$project$Main$viewLog = F2(
 								var thing = log.b;
 								var value = log.c;
 								return $elm$html$Html$text(
-									'Player ' + ($elm$core$String$fromInt(player + 1) + ('\'s ' + (thing + (' updated to ' + $author$project$Main$valueToString(value))))));
+									A2($author$project$Main$playerName, player, aliases) + ('\'s ' + (thing + (' updated to ' + $author$project$Main$valueToString(value)))));
 							}
 					}
 				}()
@@ -8404,10 +8411,6 @@ var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
 var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
 var $author$project$Main$viewPlayerIndicator = F3(
 	function (turns, playerNumber, aliases) {
-		var playerName = A2(
-			$elm$core$Maybe$withDefault,
-			'Player ' + $elm$core$String$fromInt(playerNumber + 1),
-			A2($elm$core$Dict$get, playerNumber, aliases));
 		var currentPlayerIndicator = _Utils_eq(turns.f, playerNumber) ? A2($elm$html$Html$Attributes$style, 'border', '4px solid black') : A2($elm$html$Html$Attributes$style, 'border-left', '0px');
 		return A2(
 			$elm$html$Html$div,
@@ -8419,7 +8422,8 @@ var $author$project$Main$viewPlayerIndicator = F3(
 					$elm$html$Html$input,
 					_List_fromArray(
 						[
-							$elm$html$Html$Attributes$value(playerName),
+							$elm$html$Html$Attributes$value(
+							A2($author$project$Main$playerName, playerNumber, aliases)),
 							$elm$html$Html$Events$onInput(
 							$author$project$Main$UpdatePlayerAlias(playerNumber))
 						]),
