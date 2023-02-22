@@ -116,7 +116,10 @@ type Log
     | ActionPerformed (Maybe Int) String (List Effect)
     | ValueUpdated (Maybe Int) String Value
 
-type alias PlayerAliases = Dict Int String
+
+type alias PlayerAliases =
+    Dict Int String
+
 
 type StageState
     = DefinitionStage DefinitionValidity
@@ -174,7 +177,7 @@ update msg model =
                         _ ->
                             []
             in
-              TrackerStage schema state players (oldLogs ++ newLogs) aliases |> toState
+            TrackerStage schema state players (oldLogs ++ newLogs) aliases |> toState
     in
     case msg of
         Noop ->
@@ -182,7 +185,7 @@ update msg model =
 
         MoveToPlayerSelection def ->
             case findPlayerGroup def.tracker of
-                [ (players, aliases) ] ->
+                [ ( players, aliases ) ] ->
                     if players.minPlayers == players.maxPlayers then
                         let
                             turns =
@@ -235,7 +238,7 @@ update msg model =
                     BigError e |> toState
 
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
-          withLogs schema state turns [] (Dict.insert playerNumber newAlias aliases )
+            withLogs schema state turns [] (Dict.insert playerNumber newAlias aliases)
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ _ "") ->
             model
@@ -414,7 +417,7 @@ viewLog aliases log =
         [ case log of
             GameStarted turns ->
                 if turns.playerCount > 1 then
-                    text (String.fromInt turns.playerCount ++ " player game started, player " ++ String.fromInt (turns.currentPlayerTurn + 1) ++ "'s turn")
+                    text (String.fromInt turns.playerCount ++ " player game started, " ++ playerName turns.currentPlayerTurn aliases ++ "'s turn")
 
                 else
                     text "Game started"
@@ -555,23 +558,26 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
         Action s ->
             button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
 
+
 playerName : Int -> PlayerAliases -> String
 playerName playerNumber aliases =
-  Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
+    Dict.get playerNumber aliases |> Maybe.withDefault ("Player " ++ String.fromInt (playerNumber + 1))
+
 
 viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
 viewPlayerIndicator turns playerNumber aliases =
     let
         currentPlayerIndicator =
-          if turns.currentPlayerTurn == playerNumber then
-              style "border" "4px solid black"
-          else
-              style "border-left" "0px"
+            if turns.currentPlayerTurn == playerNumber then
+                style "border" "4px solid black"
+
+            else
+                style "border-left" "0px"
     in
-      div [currentPlayerIndicator ]
-          [
-                 input [ value (playerName playerNumber aliases), onInput (UpdatePlayerAlias playerNumber) ] []
-          ]
+    div [ currentPlayerIndicator ]
+        [ input [ value (playerName playerNumber aliases), onInput (UpdatePlayerAlias playerNumber) ] []
+        ]
+
 
 viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> PlayerAliases -> Html Msg
 viewTracker schema state turns aliases =
@@ -773,8 +779,11 @@ type TrackerSchema
     | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
     | Calculated { text : String, equals : Expression }
 
+
 newPlayerAliases : List String -> PlayerAliases
-newPlayerAliases vs = List.indexedMap Tuple.pair vs |> Dict.fromList
+newPlayerAliases vs =
+    List.indexedMap Tuple.pair vs |> Dict.fromList
+
 
 findPlayerGroup : TrackerSchema -> List ( { minPlayers : Int, maxPlayers : Int }, PlayerAliases )
 findPlayerGroup schema =
