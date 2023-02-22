@@ -4,7 +4,7 @@
 
 Examples are current at the bottom of ./src/Main.elm.
 
-* Items [1/12]
+* Items [2/13]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -15,8 +15,10 @@ Examples are current at the bottom of ./src/Main.elm.
 ** TODO Player aliases 
 ** TODO Better current player indicator 
 ** TODO Regression tests
-** TODO Base64 URLs
+** DONE Base64 URLs
+   CLOSED: [2023-02-21 Tue 21:20]
 ** TODO Kill team improvements [0/2]
 *** TODO Way to track wounds 
 *** TODO Then enhance wounds with images
 ** TODO Start more complicate case 
+** TODO Monies 

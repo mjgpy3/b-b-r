@@ -1,18 +1,70 @@
 module Main exposing (..)
 
+import Base64.Decode as Base64D
+import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, h1, h2, hr, i, input, pre, text, textarea)
+import Html exposing (Html, a, button, div, h1, h2, hr, i, input, pre, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
+import Json.Encode as E
 import Maybe exposing (Maybe)
+import Platform.Cmd exposing (Cmd)
+import Platform.Sub exposing (Sub)
 import String exposing (String)
+import Url exposing (Url)
+import Url.Parser as UrlParser exposing ((<?>))
+import Url.Parser.Query as QP
 
 
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    Browser.application
+        { init = \flags url _ -> initApp flags url
+        , update = \msg model -> ( update msg model, Cmd.none )
+        , view = viewWithTile
+        , onUrlChange = \_ -> Noop
+        , onUrlRequest = \_ -> Noop
+        , subscriptions = \_ -> Sub.none
+        }
+
+
+initApp : E.Value -> Url -> ( Model, Cmd Msg )
+initApp _ url =
+    let
+        decode qp =
+            case UrlParser.parse (UrlParser.top <?> QP.string qp) { url | path = "/" } of
+                Just (Just encodedSchema) ->
+                    case Base64D.decode Base64D.string encodedSchema of
+                        Ok v ->
+                            Just v
+
+                        Err _ ->
+                            Nothing
+
+                _ ->
+                    Nothing
+    in
+    case ( decode "edit", decode "track" ) of
+        ( Just schema, _ ) ->
+            Debug.log "edit existing" ( init url |> update (UpdateDefinition schema), Cmd.none )
+
+        ( Nothing, Just schema ) ->
+            case Decode.decodeString trackerTopLevelSchemaDecoder schema of
+                Err e ->
+                    Debug.log "bad track" ( { schemaJson = schema, url = url, state = InvalidDefinition e |> DefinitionStage }, Cmd.none )
+
+                Ok d ->
+                    ( { schemaJson = schema, url = url, state = (init url).state } |> update (MoveToPlayerSelection d), Cmd.none )
+
+        _ ->
+            ( init url, Cmd.none )
+
+
+
+-- http://localhost:8000/src/Main.elm?track=abc
+-- http://localhost:8000/src/Main.elm?edit=abc
 
 
 type DefinitionValidity
@@ -80,6 +132,7 @@ type StageState
 type alias Stage =
     { schemaJson : String
     , state : StageState
+    , url : Url
     }
 
 
@@ -87,9 +140,9 @@ type alias Model =
     Stage
 
 
-init : Model
-init =
-    { schemaJson = "", state = DefinitionStage StartingOut }
+init : Url -> Model
+init url =
+    { schemaJson = "", url = url, state = DefinitionStage StartingOut }
 
 
 type TrackMsg
@@ -106,13 +159,14 @@ type Msg
     | TrackerMsg TrackerTopLevelSchema TrackingState Turns TrackMsg
     | SetNumberOfPlayers TrackerTopLevelSchema String
     | ConfirmNumberOfPlayers TrackerTopLevelSchema
+    | Noop
 
 
 update : Msg -> Model -> Model
 update msg model =
     let
         toState state =
-            { schemaJson = model.schemaJson, state = state }
+            { schemaJson = model.schemaJson, url = model.url, state = state }
 
         withLogs schema state players newLogs =
             let
@@ -127,6 +181,9 @@ update msg model =
             TrackerStage schema state players (oldLogs ++ newLogs) |> toState
     in
     case msg of
+        Noop ->
+            model
+
         MoveToPlayerSelection def ->
             case findMinAndMaxPlayers def.tracker of
                 [ players ] ->
@@ -153,10 +210,10 @@ update msg model =
         UpdateDefinition def ->
             case Decode.decodeString trackerTopLevelSchemaDecoder def of
                 Err e ->
-                    { schemaJson = def, state = InvalidDefinition e |> DefinitionStage }
+                    { schemaJson = def, url = model.url, state = InvalidDefinition e |> DefinitionStage }
 
                 Ok d ->
-                    { schemaJson = def, state = ValidDefinition d |> DefinitionStage }
+                    { schemaJson = def, url = model.url, state = ValidDefinition d |> DefinitionStage }
 
         MoveToEdit ->
             DefinitionStage StartingOut |> toState
@@ -164,7 +221,7 @@ update msg model =
         TestTracker def turns ->
             case Decode.decodeString trackerTopLevelSchemaDecoder def of
                 Err e ->
-                    { schemaJson = def, state = InvalidDefinition e |> DefinitionStage }
+                    { schemaJson = def, url = model.url, state = InvalidDefinition e |> DefinitionStage }
 
                 Ok d ->
                     let
@@ -283,16 +340,37 @@ applyEffect thisPlayer eff result =
                             Err <| ComponentIdNotFound scope targetId
 
 
+viewWithTile : Model -> Browser.Document Msg
+viewWithTile model =
+    { title =
+        case model.state of
+            DefinitionStage _ ->
+                "b-b-r | Define Tracker"
+
+            PlayerSelectionStage _ _ _ ->
+                "b-b-r | Select Players"
+
+            BigError _ ->
+                "b-b-r | Error"
+
+            TrackerStage schema _ _ _ ->
+                "b-b-r | Track " ++ schema.name
+    , body = [ view model ]
+    }
+
+
 view : Model -> Html Msg
 view model =
     case model.state of
         DefinitionStage valid ->
-            viewEditTracker model.schemaJson valid
+            viewEditTracker model.schemaJson model.url valid
 
         TrackerStage def state turns log ->
             div []
                 [ viewTracker def state turns
                 , viewLogs log
+                , div [] [ makeUrl "track" model.schemaJson model.url ]
+                , div [] [ makeUrl "edit" model.schemaJson model.url ]
                 ]
 
         PlayerSelectionStage current players schema ->
@@ -368,10 +446,15 @@ viewPlayerSelection players { minPlayers, maxPlayers } schema =
         ]
 
 
-viewEditTracker : String -> DefinitionValidity -> Html Msg
-viewEditTracker def valid =
+makeUrl : String -> String -> Url -> Html Msg
+makeUrl qp def url =
+    a [ { url | query = qp ++ "=" ++ Url.percentEncode (Base64E.encode (Base64E.string def)) |> Just } |> Url.toString |> href ] [ "URL to " ++ qp |> text ]
+
+
+viewEditTracker : String -> Url -> DefinitionValidity -> Html Msg
+viewEditTracker def url valid =
     div []
-        [ div [] [ h1 [] [ text "New Tracker" ] ]
+        [ div [] [ h1 [] [ text "Edit Tracker" ] ]
         , div [] [ textarea [ cols 40, rows 10, placeholder "...", onInput UpdateDefinition, value def ] [] ]
         , case valid of
             ValidDefinition d ->
@@ -388,6 +471,7 @@ viewEditTracker def valid =
 
             StartingOut ->
                 text ""
+        , div [] [ makeUrl "edit" def url ]
         , div [] [ h1 [] [ text "Test Tracker" ] ]
         , div [] [ button [ onClick (TestTracker simpleDominionTracker { currentPlayerTurn = 0, playerCount = 1 }) ] [ text "Dominion turn tracker" ] ]
         , div [] [ button [ onClick (TestTracker multiPlayerDominionTracker { currentPlayerTurn = 0, playerCount = 3 }) ] [ text "Multi-player Dominion turn tracker" ] ]
