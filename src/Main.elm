@@ -314,11 +314,17 @@ applyEffect thisPlayer eff result =
                                         ( RestoreDefault, _ ) ->
                                             lookupDefault default player |> Ok
 
-                                        ( Adjust amount, WholeNumber v ) ->
+                                        ( Adjust (WholeNumber amount), WholeNumber v ) ->
                                             v + amount |> WholeNumber |> Ok
 
-                                        ( Adjust amount, DecimalNumber v ) ->
+                                        ( Adjust (DecimalNumber amount), DecimalNumber v ) ->
+                                            v + amount |> DecimalNumber |> Ok
+
+                                        ( Adjust (WholeNumber amount), DecimalNumber v ) ->
                                             v + toFloat amount |> DecimalNumber |> Ok
+
+                                        ( Adjust (DecimalNumber amount), WholeNumber v ) ->
+                                            toFloat v + amount |> DecimalNumber |> Ok
 
                                 apply (player, scopedKey) res =
                                     res
@@ -660,7 +666,7 @@ specificEffectDecoder ty =
             Decode.map2 (OnCells RestoreDefault) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
         "adjust" ->
-            Decode.map3 (\a -> OnCells (Adjust a)) (field "amount" Decode.int) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
+            Decode.map3 (\a -> OnCells (Adjust a)) numberDecoder (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
         _ ->
             Decode.fail (ty ++ " is not a valid effect type")
@@ -673,7 +679,7 @@ effectDecoder =
 
 type CellEffect
     = RestoreDefault
-    | Adjust Int
+    | Adjust Value
 
 
 type CellScope
@@ -725,10 +731,12 @@ refDecoder : Decoder Expression
 refDecoder =
     Decode.map2 Ref (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
+numberDecoder : Decoder Value
+numberDecoder =  Decode.oneOf [ Decode.map WholeNumber Decode.int, Decode.map DecimalNumber Decode.float ] 
 
 literalDecoder : Decoder Expression
 literalDecoder =
-    Decode.map Literal (field "value" ( Decode.oneOf [ Decode.map WholeNumber Decode.int, Decode.map DecimalNumber Decode.float ] ))
+    Decode.map Literal (field "value" numberDecoder)
 
 
 specificExpressionDecoder : String -> Decoder Expression
@@ -758,7 +766,6 @@ expressionDecoder =
 wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
     let
-        numberDecoder = Decode.map WholeNumber Decode.int
         playerDefaultsDecoder =
           Decode.map Dict.fromList (field "playerDefaults"
                (Decode.list (Decode.map2 (\a b -> (a, b)) (field "player" Decode.int) (field "default" numberDecoder )) ))

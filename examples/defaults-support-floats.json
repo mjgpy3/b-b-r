@@ -1,0 +1,34 @@
+{
+  "name": "Per Player Defaults",
+  "tracker": {
+    "type": "player-group",
+    "minPlayers": 2,
+    "maxPlayers": 6,
+    "items": [
+      {
+        "type": "number",
+        "text": "Floats!",
+        "default": 4.2,
+        "playerDefaults": [
+          {
+            "player": 0,
+            "default": 5.9
+          },
+          {
+            "player": 2,
+            "default": 10.93
+          },
+          {
+            "player": 3,
+            "default": 99.99
+          },
+          {
+            "player": 5,
+            "default": 42.42
+          }
+        ],
+        "id": "value"
+      }
+    ]
+  }
+}
