@@ -541,14 +541,17 @@ viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -
 viewTrackerComponent schema tracker state turns playerNumber aliases =
     case tracker of
         WholeNumberSchema s ->
-            div []
-                [ text s.text
-                , text " "
-                , if s.disabled then
-                    text (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state))
+            if s.hidden
+            then div [] []
+            else
+              div []
+                  [ text s.text
+                  , text " "
+                  , if s.disabled then
+                      text (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state))
 
-                  else
-                    input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
+                    else
+                      input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value (valueToString <| Maybe.withDefault s.default (Dict.get (key s.id playerNumber) state)) ] []
                 ]
 
         Calculated s ->
@@ -752,12 +755,13 @@ expressionDecoder =
 
 wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
-    Decode.map4
-        (\text default id disabled -> WholeNumberSchema { text = text, default = default, id = id, disabled = disabled == Just True })
+    Decode.map5
+        (\text default id disabled hidden -> WholeNumberSchema { text = text, default = default, id = id, disabled = disabled == Just True, hidden = hidden == Just True })
         (field "text" string)
         (field "default" (Decode.map WholeNumber Decode.int))
         (field "id" string)
         (Decode.maybe (field "disabled" Decode.bool))
+        (Decode.maybe (field "hidden" Decode.bool))
 
 
 calculatedDecoder : Decoder TrackerSchema
@@ -810,7 +814,7 @@ type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
     | Group { items : List TrackerSchema }
     | Action { text : String, effects : List Effect }
-    | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool }
+    | WholeNumberSchema { text : String, default : Value, id : String, disabled : Bool, hidden : Bool }
     | Calculated { text : String, equals : Expression }
 
 

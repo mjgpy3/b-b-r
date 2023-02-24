@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [5/19]
+* Items [6/28]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -30,4 +30,14 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Stronger, earlier validation 
 ** TODO Log compaction
 ** TODO Log "before" value 
-** TODO Numeric fields should have a mix/min value
+** TODO Allow numeric fields to have a mix/min value
+** DONE Hidden fields 
+   CLOSED: [2023-02-23 Thu 23:46]
+** TODO Allow for per-player field defaults
+** TODO Allow "add item" for item types (op wounds, checks, etc...) 
+** TODO Sum function 
+** TODO Expandable sections 
+** TODO Sum cross-player 
+** TODO Horizontal group 
+** TODO Way to spawn similar fields (e.g. foreach, dhall?) 
+** TODO Calculated fields referencing calculated fields 

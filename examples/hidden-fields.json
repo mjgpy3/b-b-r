@@ -1,0 +1,39 @@
+{
+  "name": "Hidden Fields",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "number",
+        "text": "1",
+        "default": 2,
+        "hidden": true,
+        "id": "a"
+      },
+      {
+        "type": "number",
+        "text": "1",
+        "default": 21,
+        "hidden": true,
+        "id": "b"
+      },
+      {
+        "type": "calculated",
+        "text": "Answer",
+        "equals": {
+          "type": "mul",
+          "ops": [
+            {
+              "type": "ref",
+              "targetId": "a"
+            },
+            {
+              "type": "ref",
+              "targetId": "b"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
