@@ -1,0 +1,52 @@
+{
+  "name": "Per Player Defaults",
+  "tracker": {
+    "type": "player-group",
+    "minPlayers": 2,
+    "maxPlayers": 6,
+    "items": [
+      {
+        "type": "number",
+        "text": "9 | NONE | 3 | 4 | NONE | 7, where NONE=2 is the overall default",
+        "default": 2,
+        "playerDefaults": [
+          {
+            "player": 0,
+            "default": 9
+          },
+          {
+            "player": 2,
+            "default": 3
+          },
+          {
+            "player": 3,
+            "default": 4
+          },
+          {
+            "player": 5,
+            "default": 7
+          }
+        ],
+        "id": "value"
+      },
+      {
+        "type": "calculated",
+        "text": "Value + 1",
+        "equals": {
+          "type": "add",
+          "ops": [
+            {
+              "type": "ref",
+                "targetId": "value",
+                "scope": "this-player"
+            },
+            {
+              "type": "literal",
+              "value": 1
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
