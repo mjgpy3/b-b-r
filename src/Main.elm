@@ -114,12 +114,13 @@ type Error
     | CouldNotParseWholeNumber String
     | TooManyPlayerGroupsDefined
     | CannotSetCurrentPlayerToThisWithEffectsOutsideContext
+    | UnexpectedError String
 
 
 type Log
     = GameStarted Turns
     | ActionPerformed (Maybe Int) String (List Effect)
-    | ValueUpdated (Maybe Int) String Value
+    | ValueUpdated { player : Maybe Int, old : Value, new : Value, field : String }
 
 
 type alias PlayerAliases =
@@ -242,7 +243,19 @@ update msg model =
                         num =
                             WholeNumber v
                     in
-                    withLogs schema (Dict.insert (key id player) num state) turns [ ValueUpdated player field num ] aliases
+                    case idDefault id schema.tracker of
+                        Just default ->
+                            let
+                                oldValue =
+                                    state |> Dict.get (key id player) |> Maybe.withDefault (lookupDefault default player)
+
+                                event =
+                                    ValueUpdated { player = player, old = oldValue, new = num, field = field }
+                            in
+                            withLogs schema (Dict.insert (key id player) num state) turns [ event ] aliases
+
+                        Nothing ->
+                            "Could not find old value for update" |> UnexpectedError |> BigError |> toState
 
                 Nothing ->
                     CouldNotParseWholeNumber rawValue |> BigError |> toState
@@ -403,6 +416,9 @@ view model =
 
                     CannotSetCurrentPlayerToThisWithEffectsOutsideContext ->
                         text "To set this-player as the current player the effects must originate from the context of a player"
+
+                    UnexpectedError message ->
+                        "Unexpected error: " ++ message |> text
                 , button [ onClick MoveToEdit ] [ text "Return to edit" ]
                 ]
 
@@ -429,11 +445,13 @@ viewLog aliases log =
             ActionPerformed Nothing action _ ->
                 text action
 
-            ValueUpdated Nothing thing value ->
-                text (thing ++ " updated to " ++ valueToString value)
+            ValueUpdated s ->
+                case s.player of
+                    Nothing ->
+                        text (s.field ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
 
-            ValueUpdated (Just player) thing value ->
-                text (playerName player aliases ++ "'s " ++ thing ++ " updated to " ++ valueToString value)
+                    Just player ->
+                        text (playerName player aliases ++ "'s " ++ s.field ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
         ]
 
 
@@ -671,7 +689,7 @@ specificEffectDecoder ty =
             Decode.map2 (OnCells RestoreDefault) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
         "adjust" ->
-            Decode.map3 (\a -> OnCells (Adjust a)) numberDecoder (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
+            Decode.map3 (\a -> OnCells (Adjust a)) (field "amount" numberDecoder) (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
         _ ->
             Decode.fail (ty ++ " is not a valid effect type")
