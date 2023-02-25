@@ -201,7 +201,10 @@ update msg model =
                               case tail of
                                   [ValueUpdated a, ValueUpdated b] ->
                                       if a.player == b.player && a.field == b.field
-                                      then [ValueUpdated { b | old=a.old }]
+                                      then
+                                          if b.new == a.old
+                                          then []
+                                          else [ValueUpdated { b | old=a.old }]
                                       else tail
                                   _ -> tail
                       in head ++ newTail
@@ -276,7 +279,9 @@ update msg model =
                                 event =
                                     ValueUpdated { player = player, old = oldValue, new = num, field = field }
                             in
-                            log schema (Dict.insert (key id player) num state) turns (Just <| event) aliases
+                            if oldValue == num
+                            then model
+                            else log schema (Dict.insert (key id player) num state) turns (Just <| event) aliases
 
                         Nothing ->
                             "Could not find old value for update" |> UnexpectedError |> BigError |> toState
