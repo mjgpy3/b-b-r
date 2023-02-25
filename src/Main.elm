@@ -623,6 +623,13 @@ eval schema turns expr thisPlayer state currentPlayer =
 viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> PlayerAliases -> Html TrackMsg
 viewTrackerComponent schema tracker state turns playerNumber aliases =
     case tracker of
+        TextSchema s ->
+            div []
+                [ text s.text
+                , text " "
+                , input [] []
+                ]
+
         WholeNumberSchema s ->
             if s.hidden then
                 div [] []
@@ -889,6 +896,12 @@ wholeNumberDecoder =
         (Decode.maybe (field "hidden" Decode.bool))
         (Decode.map (Maybe.withDefault Dict.empty) <| Decode.maybe playerDefaultsDecoder)
 
+textDecoder : Decoder TrackerSchema
+textDecoder =
+    Decode.map2
+        (\text id -> TextSchema { text = text, id = id })
+        (field "text" string)
+        (field "id" string)
 
 calculatedDecoder : Decoder TrackerSchema
 calculatedDecoder =
@@ -912,6 +925,9 @@ specificTrackerSchemaDecoder ty =
 
         "number" ->
             wholeNumberDecoder
+
+        "text" ->
+            textDecoder
 
         "calculated" ->
             calculatedDecoder
@@ -956,6 +972,7 @@ type TrackerSchema
     | Group { items : List TrackerSchema, collapsed: Maybe Bool, text : Maybe String }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool }
+    | TextSchema { text : String, id: String }
     | Calculated { text : String, equals : Expression }
 
 
@@ -968,6 +985,9 @@ findPlayerGroup : TrackerSchema -> List ( { minPlayers : Int, maxPlayers : Int }
 findPlayerGroup schema =
     case schema of
         WholeNumberSchema s ->
+            []
+
+        TextSchema s ->
             []
 
         Group s ->
@@ -986,6 +1006,8 @@ findPlayerGroup schema =
 idDefault : String -> TrackerSchema -> Maybe Defaults
 idDefault id schema =
     case schema of
+        TextSchema s -> Nothing
+
         WholeNumberSchema s ->
             if s.id == id then
                 Just s.default

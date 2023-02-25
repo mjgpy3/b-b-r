@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [13/32]
+* Items [14/34]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -51,3 +51,6 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Calculated fields referencing calculated fields 
 ** TODO Allow errors to return to tracking 
 ** TODO Allow to disable turns
+** TODO Make visual of how scopes work 
+** DONE Text Field 
+   CLOSED: [2023-02-25 Sat 10:01]
