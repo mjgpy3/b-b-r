@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Base64.Decode as Base64D
 import Base64.Encode as Base64E
-import Round as Round
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
@@ -14,6 +13,7 @@ import Json.Encode as E
 import Maybe exposing (Maybe)
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub)
+import Round as Round
 import String exposing (String)
 import Url exposing (Url)
 import Url.Parser as UrlParser exposing ((<?>))
@@ -79,6 +79,7 @@ valueToString v =
     case v of
         WholeNumber n ->
             String.fromInt n
+
         DecimalNumber n ->
             String.fromFloat n
 
@@ -295,16 +296,16 @@ applyEffect thisPlayer eff result =
                         scopedKeys =
                             case scope of
                                 NonPlayer ->
-                                    [ (Nothing, targetId) ]
+                                    [ ( Nothing, targetId ) ]
 
                                 CurrentPlayer ->
-                                    [ (Just turns.currentPlayerTurn, key targetId (Just turns.currentPlayerTurn)) ]
+                                    [ ( Just turns.currentPlayerTurn, key targetId (Just turns.currentPlayerTurn) ) ]
 
                                 AllPlayers ->
-                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> (Just i, key targetId (Just i)))
+                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> ( Just i, key targetId (Just i) ))
 
                                 ThisPlayer ->
-                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> (Just i, key targetId (Just i)))
+                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> ( Just i, key targetId (Just i) ))
                     in
                     case idDefault targetId schema.tracker of
                         Just default ->
@@ -326,7 +327,7 @@ applyEffect thisPlayer eff result =
                                         ( Adjust (DecimalNumber amount), WholeNumber v ) ->
                                             toFloat v + amount |> DecimalNumber |> Ok
 
-                                apply (player, scopedKey) res =
+                                apply ( player, scopedKey ) res =
                                     res
                                         |> Result.andThen
                                             (\( sc, st, tu ) ->
@@ -485,7 +486,7 @@ eval schema expr thisPlayer state currentPlayer =
                 Ok (DecimalNumber v2) ->
                     case aux a of
                         Ok (WholeNumber v1) ->
-                            Ok (DecimalNumber (oFloat (toFloat v1 ) v2))
+                            Ok (DecimalNumber (oFloat (toFloat v1) v2))
 
                         Ok (DecimalNumber v1) ->
                             Ok (DecimalNumber (oFloat v1 v2))
@@ -497,6 +498,7 @@ eval schema expr thisPlayer state currentPlayer =
                     case aux a of
                         Ok (WholeNumber v1) ->
                             Ok (WholeNumber (oInt v1 v2))
+
                         Ok (DecimalNumber v1) ->
                             Ok (DecimalNumber (oFloat v1 (toFloat v2)))
 
@@ -547,20 +549,23 @@ viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -
 viewTrackerComponent schema tracker state turns playerNumber aliases =
     case tracker of
         WholeNumberSchema s ->
-            if s.hidden
-            then div [] []
+            if s.hidden then
+                div [] []
+
             else
-              let
-                v = valueToString <| Maybe.withDefault (lookupDefault s.default playerNumber) (Dict.get (key s.id playerNumber) state)
-              in
+                let
+                    v =
+                        valueToString <| Maybe.withDefault (lookupDefault s.default playerNumber) (Dict.get (key s.id playerNumber) state)
+                in
                 div []
                     [ text s.text
                     , text " "
                     , if s.disabled then
                         text v
+
                       else
-                        input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value v] []
-                ]
+                        input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value v ] []
+                    ]
 
         Calculated s ->
             div []
@@ -731,8 +736,11 @@ refDecoder : Decoder Expression
 refDecoder =
     Decode.map2 Ref (field "targetId" string) (Decode.maybe (field "scope" string) |> Decode.andThen cellScopeDecoder)
 
+
 numberDecoder : Decoder Value
-numberDecoder =  Decode.oneOf [ Decode.map WholeNumber Decode.int, Decode.map DecimalNumber Decode.float ] 
+numberDecoder =
+    Decode.oneOf [ Decode.map WholeNumber Decode.int, Decode.map DecimalNumber Decode.float ]
+
 
 literalDecoder : Decoder Expression
 literalDecoder =
@@ -767,17 +775,19 @@ wholeNumberDecoder : Decoder TrackerSchema
 wholeNumberDecoder =
     let
         playerDefaultsDecoder =
-          Decode.map Dict.fromList (field "playerDefaults"
-               (Decode.list (Decode.map2 (\a b -> (a, b)) (field "player" Decode.int) (field "default" numberDecoder )) ))
+            Decode.map Dict.fromList
+                (field "playerDefaults"
+                    (Decode.list (Decode.map2 (\a b -> ( a, b )) (field "player" Decode.int) (field "default" numberDecoder)))
+                )
     in
-      Decode.map6
-          (\text default id disabled hidden playerDefaults -> WholeNumberSchema { text = text, default = { playerDefaults=playerDefaults, default=default }, id = id, disabled = disabled == Just True, hidden = hidden == Just True })
-          (field "text" string)
-          (field "default" numberDecoder)
-          (field "id" string)
-          (Decode.maybe (field "disabled" Decode.bool))
-          (Decode.maybe (field "hidden" Decode.bool))
-          (Decode.map (Maybe.withDefault Dict.empty) <| Decode.maybe playerDefaultsDecoder)
+    Decode.map6
+        (\text default id disabled hidden playerDefaults -> WholeNumberSchema { text = text, default = { playerDefaults = playerDefaults, default = default }, id = id, disabled = disabled == Just True, hidden = hidden == Just True })
+        (field "text" string)
+        (field "default" numberDecoder)
+        (field "id" string)
+        (Decode.maybe (field "disabled" Decode.bool))
+        (Decode.maybe (field "hidden" Decode.bool))
+        (Decode.map (Maybe.withDefault Dict.empty) <| Decode.maybe playerDefaultsDecoder)
 
 
 calculatedDecoder : Decoder TrackerSchema
@@ -825,14 +835,20 @@ type Expression
     | Ref String CellScope
     | Literal Value
 
+
 lookupDefault : Defaults -> Maybe Int -> Value
 lookupDefault defaults player =
     case player of
-        Just p -> defaults.playerDefaults |> Dict.get p |> Maybe.withDefault defaults.default
-        Nothing -> defaults.default
+        Just p ->
+            defaults.playerDefaults |> Dict.get p |> Maybe.withDefault defaults.default
 
-type alias Defaults
-    = { playerDefaults: Dict Int Value, default: Value }
+        Nothing ->
+            defaults.default
+
+
+type alias Defaults =
+    { playerDefaults : Dict Int Value, default : Value }
+
 
 type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }

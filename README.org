@@ -21,10 +21,9 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Regression tests
 ** DONE Base64 URLs
    CLOSED: [2023-02-21 Tue 21:20]
-** TODO Kill team improvements [0/2]
+** TODO Kill team improvements [0/1]
 *** TODO Way to track wounds 
-*** TODO Then enhance wounds with images
-** TODO Start more complicate case 
+** TODO Start more complicated case 
 ** DONE Monies 
    CLOSED: [2023-02-22 Wed 00:00]
 ** TODO Stronger, earlier validation 
