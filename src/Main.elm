@@ -5,7 +5,7 @@ import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, a, button, div, h1, h2, hr, i, input, pre, text, textarea)
+import Html exposing (Html, a, button, div, h1, h2, hr, i, input, pre, text, textarea, b, details, summary)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
@@ -647,10 +647,25 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                 ]
 
         Group s ->
-            div [] (List.map (\i -> viewTrackerComponent schema i state turns playerNumber aliases) s.items)
+            let
+                collapses = s.collapsed == Just True
+                header = case s.text of
+                           Just t -> div [] [b [] [text t]]
+                           Nothing -> div [] []
+
+                group content =
+                    div
+                        [style "border" "1px solid black"]
+                        [
+                          if collapses
+                          then details [] ( summary [] [header] :: content)
+                          else div [] content
+                        ]
+            in
+                s.items |> List.map (\i -> viewTrackerComponent schema i state turns playerNumber aliases) |> group
 
         PlayerGroup s ->
-            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items }) state turns (Just i) aliases ]) |> div []
+            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed=Nothing, text=Nothing }) state turns (Just i) aliases ]) |> div []
 
         Action s ->
             button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
@@ -780,7 +795,10 @@ playerGroupDecoder =
 
 groupDecoder : Decoder TrackerSchema
 groupDecoder =
-    Decode.map (\items -> Group { items = items }) <| field "items" (Decode.list trackerSchemaDecoder)
+    Decode.map3 (\items collapsed text -> Group { items = items, collapsed=collapsed, text=text })
+        (field "items" (Decode.list trackerSchemaDecoder))
+        (field "collapsed" (Decode.maybe Decode.bool))
+        (field "text" (Decode.maybe Decode.string))
 
 
 actionDecoder : Decoder TrackerSchema
@@ -916,7 +934,7 @@ type alias Defaults =
 
 type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
-    | Group { items : List TrackerSchema }
+    | Group { items : List TrackerSchema, collapsed: Maybe Bool, text : Maybe String }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool }
     | Calculated { text : String, equals : Expression }
