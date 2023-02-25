@@ -797,8 +797,8 @@ groupDecoder : Decoder TrackerSchema
 groupDecoder =
     Decode.map3 (\items collapsed text -> Group { items = items, collapsed=collapsed, text=text })
         (field "items" (Decode.list trackerSchemaDecoder))
-        (field "collapsed" (Decode.maybe Decode.bool))
-        (field "text" (Decode.maybe Decode.string))
+        (Decode.maybe (field "collapsed" Decode.bool))
+        (Decode.maybe (field "text" Decode.string))
 
 
 actionDecoder : Decoder TrackerSchema
