@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [12/32]
+* Items [13/32]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -41,7 +41,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** DONE Defaults should support floats
    CLOSED: [2023-02-24 Fri 00:34]
 ** TODO Allow "add item" for item types (op wounds, checks, etc...) 
-** TODO Sum function 
+** DONE Sum function 
+   CLOSED: [2023-02-25 Sat 01:49]
 ** DONE Expandable sections
    CLOSED: [2023-02-25 Sat 00:52]
 ** TODO Sum cross-player 

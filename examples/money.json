@@ -227,6 +227,18 @@
             }
           }
         ]
+      },
+      {
+        "type": "calculated",
+        "text": "Total Ones",
+        "equals": {
+          "type": "sum",
+          "of": {
+            "type": "ref",
+            "targetId": "ones",
+            "scope": "all-players"
+          }
+        }
       }
     ]
   }

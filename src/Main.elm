@@ -101,6 +101,9 @@ key id player =
         Nothing ->
             id
 
+playerIds : Turns -> List Int
+playerIds turns = List.range 0 (turns.playerCount - 1)
+
 
 type alias Turns =
     { currentPlayerTurn : Int
@@ -360,11 +363,14 @@ applyEffect thisPlayer eff result =
                                 CurrentPlayer ->
                                     [ ( Just turns.currentPlayerTurn, key targetId (Just turns.currentPlayerTurn) ) ]
 
+                                SpecificPlayer p ->
+                                    [ ( Just p, key targetId (Just p) ) ]
+
                                 AllPlayers ->
-                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> ( Just i, key targetId (Just i) ))
+                                    playerIds turns |> List.map (\i -> ( Just i, key targetId (Just i) ))
 
                                 ThisPlayer ->
-                                    List.range 0 (turns.playerCount - 1) |> List.map (\i -> ( Just i, key targetId (Just i) ))
+                                    playerIds turns |> List.map (\i -> ( Just i, key targetId (Just i) ))
                     in
                     case idDefault targetId schema.tracker of
                         Just default ->
@@ -442,13 +448,7 @@ view model =
                     ComponentIdNotFound NonPlayer id ->
                         text ("Could not find non-player component ID when applying effect: " ++ id)
 
-                    ComponentIdNotFound CurrentPlayer id ->
-                        text ("Could not find component ID in player-group when applying effect: " ++ id)
-
-                    ComponentIdNotFound ThisPlayer id ->
-                        text ("Could not find component ID in player-group when applying effect: " ++ id)
-
-                    ComponentIdNotFound AllPlayers id ->
+                    ComponentIdNotFound _ id ->
                         text ("Could not find component ID in player-group when applying effect: " ++ id)
 
                     CouldNotReadNumberOfPlayers ->
@@ -538,33 +538,31 @@ viewEditTracker def url valid =
         , div [] [ makeUrl "edit" def url ]
         ]
 
+firstError : List (Result e v) -> Result e (List v)
+firstError vs =
+    case vs of
+        [] -> Ok []
+        res::ress -> res |> Result.andThen (\v -> Result.map ((::) v) <| firstError ress)
 
-eval : TrackerTopLevelSchema -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
-eval schema expr thisPlayer state currentPlayer =
+eval : TrackerTopLevelSchema -> Turns -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
+eval schema turns expr thisPlayer state currentPlayer =
     let
+        append oInt oFloat x y =
+            case (x, y) of
+                (WholeNumber a, WholeNumber b) -> oInt a b |> WholeNumber
+                (WholeNumber a, DecimalNumber b) -> oFloat (toFloat a)  b |> DecimalNumber
+                (DecimalNumber a, DecimalNumber b) -> oFloat a b |> DecimalNumber
+                (DecimalNumber a, WholeNumber b) -> oFloat a (toFloat b) |> DecimalNumber
+
         op oInt oFloat a b =
             case b of
                 Err err ->
                     Err err
 
-                Ok (DecimalNumber v2) ->
+                Ok v2 ->
                     case aux a of
-                        Ok (WholeNumber v1) ->
-                            Ok (DecimalNumber (oFloat (toFloat v1) v2))
-
-                        Ok (DecimalNumber v1) ->
-                            Ok (DecimalNumber (oFloat v1 v2))
-
-                        Err err ->
-                            Err err
-
-                Ok (WholeNumber v2) ->
-                    case aux a of
-                        Ok (WholeNumber v1) ->
-                            Ok (WholeNumber (oInt v1 v2))
-
-                        Ok (DecimalNumber v1) ->
-                            Ok (DecimalNumber (oFloat v1 (toFloat v2)))
+                        Ok v1 ->
+                            append oInt oFloat v1 v2 |> Ok
 
                         Err err ->
                             Err err
@@ -576,6 +574,16 @@ eval schema expr thisPlayer state currentPlayer =
 
                 Op Mul ops ->
                     List.foldl (op (\a b -> a * b) (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
+
+                Op Sum [Ref targetId AllPlayers] ->
+                    turns
+                        |> playerIds
+                        |> List.map (SpecificPlayer >> Ref targetId >> aux)
+                        |> firstError
+                        |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
+
+                Op Sum _ ->
+                    Err "A sum must reference all players"
 
                 Literal v ->
                     Ok v
@@ -589,6 +597,9 @@ eval schema expr thisPlayer state currentPlayer =
 
                                 ( CurrentPlayer, _ ) ->
                                     Ok (Just currentPlayer)
+
+                                ( SpecificPlayer p, _ ) ->
+                                    Ok (Just p)
 
                                 ( AllPlayers, _ ) ->
                                     Err "Calculated fields cannot reference all players"
@@ -635,7 +646,7 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
             div []
                 [ text s.text
                 , text " "
-                , case eval schema s.equals playerNumber state turns.currentPlayerTurn of
+                , case eval schema turns s.equals playerNumber state turns.currentPlayerTurn of
                     Ok (WholeNumber v) ->
                         v |> String.fromInt |> text
 
@@ -655,7 +666,7 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
 
                 group content =
                     div
-                        [style "border" "1px solid black", style "margin-left" "1rem"]
+                        [style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem"]
                         [
                           if collapses
                           then details [] ( summary [] [header] :: content)
@@ -665,7 +676,7 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                 s.items |> List.map (\i -> viewTrackerComponent schema i state turns playerNumber aliases) |> group
 
         PlayerGroup s ->
-            List.range 0 (turns.playerCount - 1) |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed=Nothing, text=Nothing }) state turns (Just i) aliases ]) |> div []
+            playerIds turns |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed=Nothing, text=Nothing }) state turns (Just i) aliases ]) |> div []
 
         Action s ->
             button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
@@ -771,6 +782,7 @@ type CellScope
     | CurrentPlayer
     | AllPlayers
     | ThisPlayer
+    | SpecificPlayer Int
 
 
 type NewCurrentPlayer
@@ -813,6 +825,9 @@ opDecoder : Operator -> Decoder Expression
 opDecoder op =
     Decode.map (\ops -> Op op ops) (field "ops" (Decode.list expressionDecoder))
 
+sumDecoder : Decoder Expression
+sumDecoder =
+    Decode.map (\op -> Op Sum [op]) (field "of" expressionDecoder)
 
 refDecoder : Decoder Expression
 refDecoder =
@@ -837,6 +852,9 @@ specificExpressionDecoder ty =
 
         "mul" ->
             opDecoder Mul
+
+        "sum" ->
+            sumDecoder
 
         "ref" ->
             refDecoder
@@ -910,6 +928,7 @@ trackerSchemaDecoder =
 type Operator
     = Add
     | Mul
+    | Sum
 
 
 type Expression
