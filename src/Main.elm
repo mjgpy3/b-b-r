@@ -600,6 +600,9 @@ applyEffect key eff result =
                                 AllPlayers ->
                                     playerIds turns |> List.map (\p -> targetId |> KeyNotUnderList |> PlayerKey p)
 
+                                AllPlayersLists ->
+                                    []
+
                                 ThisPlayer ->
                                     case key of
                                         PlayerKey p _ ->
@@ -832,6 +835,15 @@ eval schema turns expr key state currentPlayer =
                         |> firstError
                         |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
+                Op Sum [ Ref targetId AllPlayersLists ] ->
+                    turns
+                        |> playerIds
+                        |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault [] |> List.map (\v -> (p, v)))
+                        |> List.filter (\(_, item) -> item.live)
+                        |> List.map (\(p, i) -> get (key |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
+                        |> firstError
+                        |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
+
                 Op Sum [ Ref targetId ThisPlayer ] ->
                     case key of
                         NonPlayerKey _ ->
@@ -867,7 +879,10 @@ eval schema turns expr key state currentPlayer =
                                     targetId |> KeyNotUnderList |> PlayerKey p |> Ok
 
                                 ( AllPlayers, _ ) ->
-                                    Err "Calculated fields cannot reference all players"
+                                    Err "Scalar calculated fields cannot reference all players"
+
+                                ( AllPlayersLists, _ ) ->
+                                    Err "Scalar calculated fields cannot reference lists"
 
                                 ( ThisPlayer, PlayerKey this _ ) ->
                                     targetId |> KeyNotUnderList |> PlayerKey this |> Ok
@@ -1032,6 +1047,9 @@ cellScopeDecoder scope =
         Just "all-players" ->
             Decode.succeed AllPlayers
 
+        Just "all-players-lists" ->
+            Decode.succeed AllPlayersLists
+
         Just s ->
             Decode.fail (s ++ " is not a valid effect scope")
 
@@ -1084,6 +1102,7 @@ type CellScope
     = NonPlayer
     | CurrentPlayer
     | AllPlayers
+    | AllPlayersLists
     | ThisPlayer
     | SpecificPlayer Int
 

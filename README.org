@@ -4,9 +4,11 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [16/37]
-** TODO Sum for list items
-** TODO Sum cross-player 
+* Items [18/38]
+** DONE Sum for list items
+   CLOSED: [2023-02-25 Sat 14:33]
+** DONE Sum cross-player 
+   CLOSED: [2023-02-25 Sat 14:49]
 ** TODO Calculated fields referencing calculated fields 
 ** TODO Allow to disable turns
 ** TODO Override labels like "Player" and "Players" 

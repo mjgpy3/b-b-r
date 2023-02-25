@@ -264,6 +264,18 @@
             }
           }
         ]
+      },
+      {
+        "type": "calculated",
+        "text": "Check Total",
+        "equals": {
+          "type": "sum",
+          "of": {
+            "type": "ref",
+            "targetId": "check-amount",
+            "scope": "all-players-lists"
+          }
+        }
       }
     ]
   }
