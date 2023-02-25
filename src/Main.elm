@@ -171,13 +171,33 @@ schemaId key =
 type alias MaybeUnderList =
     { notUnderList : Dict String Value
     , underList : Dict Int (Dict String Value)
+    , listItems : List { index : Int, live : Bool }
     }
+
+
+listItems : Key String -> TrackingState -> List { index : Int, live : Bool }
+listItems key state =
+    case key of
+        NonPlayerKey _ ->
+            state.nonPlayer.listItems
+
+        PlayerKey p _ ->
+            state.player
+                |> Dict.get p
+                |> Maybe.map .listItems
+                |> Maybe.withDefault []
 
 
 type alias TrackingState =
     { nonPlayer : MaybeUnderList
     , player : Dict Int MaybeUnderList
-    , items : List { index : Int, live : Bool }
+    }
+
+
+emptyMul =
+    { notUnderList = Dict.empty
+    , underList = Dict.empty
+    , listItems = []
     }
 
 
@@ -186,10 +206,57 @@ emptyState =
     { nonPlayer =
         { notUnderList = Dict.empty
         , underList = Dict.empty
+        , listItems = []
         }
     , player = Dict.empty
-    , items = []
     }
+
+
+removeItem : Key k -> TrackingState -> TrackingState
+removeItem key state =
+    let
+        removeListItem idx mul =
+            case mul of
+                Just m ->
+                    { m | listItems = List.map (\item -> { item | live = item.live && item.index /= idx }) m.listItems }
+
+                Nothing ->
+                    emptyMul
+    in
+    case key of
+        NonPlayerKey (KeyUnderList idx _) ->
+            { state | nonPlayer = removeListItem idx (Just state.nonPlayer) }
+
+        PlayerKey p (KeyUnderList idx _) ->
+            { state | player = Dict.update p (removeListItem idx >> Just) state.player }
+
+        NonPlayerKey (KeyNotUnderList _) ->
+            state
+
+        PlayerKey _ (KeyNotUnderList _) ->
+            state
+
+
+addItem : Key k -> TrackingState -> TrackingState
+addItem key state =
+    let
+        addTo items =
+            { live = True, index = List.length items } :: items
+
+        addListItem mul =
+            case mul of
+                Just m ->
+                    { m | listItems = addTo m.listItems }
+
+                Nothing ->
+                    { emptyMul | listItems = addTo [] }
+    in
+    case key of
+        NonPlayerKey _ ->
+            { state | nonPlayer = addListItem (Just state.nonPlayer) }
+
+        PlayerKey p _ ->
+            { state | player = Dict.update p (addListItem >> Just) state.player }
 
 
 set : Key String -> Value -> TrackingState -> TrackingState
@@ -206,13 +273,13 @@ set key value state =
         setMul mulKey mul =
             case ( mulKey, mul ) of
                 ( KeyNotUnderList id, Nothing ) ->
-                    { underList = Dict.empty, notUnderList = Dict.singleton id value }
+                    { listItems = [], underList = Dict.empty, notUnderList = Dict.singleton id value }
 
                 ( KeyNotUnderList id, Just s ) ->
                     { s | notUnderList = Dict.insert id value s.notUnderList }
 
                 ( KeyUnderList idx id, Nothing ) ->
-                    { notUnderList = Dict.empty, underList = Dict.singleton idx (Dict.singleton id value) }
+                    { listItems = [], notUnderList = Dict.empty, underList = Dict.singleton idx (Dict.singleton id value) }
 
                 ( KeyUnderList idx id, Just s ) ->
                     { s | underList = Dict.update idx (setInner id >> Just) s.underList }
@@ -321,7 +388,7 @@ type TrackMsg
     | SetWholeNumber Field (Key String) String
     | UpdatePlayerAlias Int String
     | NewListItem (Key ()) Field
-    | RemoveListItem Int
+    | RemoveListItem (Key ())
 
 
 type Msg
@@ -443,10 +510,10 @@ update msg model =
             model
 
         TrackerMsg schema state turns aliases (NewListItem key field) ->
-            log schema { state | items = { live = True, index = List.length state.items } :: state.items } turns Nothing aliases
+            log schema (addItem key state) turns Nothing aliases
 
-        TrackerMsg schema state turns aliases (RemoveListItem index) ->
-            log schema { state | items = List.map (\item -> {item | live=item.index /= index && item.live }) state.items} turns Nothing aliases
+        TrackerMsg schema state turns aliases (RemoveListItem key) ->
+            log schema (removeItem key state) turns Nothing aliases
 
         TrackerMsg schema state turns aliases (SetWholeNumber field key rawValue) ->
             case String.toInt rawValue of
@@ -767,11 +834,16 @@ eval schema turns expr key state currentPlayer =
 
                 Op Sum [ Ref targetId ThisPlayer ] ->
                     case key of
-                        NonPlayerKey _ -> "Found reference to this-player's " ++ targetId ++ "outside of player context!"|> Err
+                        NonPlayerKey _ ->
+                            "Found reference to this-player's " ++ targetId ++ "outside of player context!" |> Err
+
                         PlayerKey p _ ->
-                            state.items
+                            state.player
+                                |> Dict.get p
+                                |> Maybe.map .listItems
+                                |> Maybe.withDefault []
                                 |> List.filter (\i -> i.live)
-                                |> List.map (\i -> get (key |> keyWithItemNumber i.index |> keyWithId targetId) (state, schema))
+                                |> List.map (\i -> get (key |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                                 |> firstError
                                 |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
@@ -860,14 +932,18 @@ viewTrackerComponent schema tracker state turns key aliases =
                 [ style "border" "1px solid black"
                 ]
                 [ div [] [ text s.text, button [ onClick (NewListItem key { id = s.id, text = s.text }) ] [ text "+" ] ]
-                , state.items
+                , listItems (keyWithId s.id key) state
                     |> List.map
                         (\item ->
                             ( String.fromInt item.index
                             , if item.live then
+                                let
+                                    itemKey =
+                                        keyWithItemNumber item.index key
+                                in
                                 div []
-                                    [ viewTrackerComponent schema (Group { collapsed = Just False, items = s.items, text = Nothing }) state turns (keyWithItemNumber item.index key) aliases
-                                    , button [style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem item.index) ] [ text "Remove" ]
+                                    [ viewTrackerComponent schema (Group { collapsed = Just False, items = s.items, text = Nothing }) state turns itemKey aliases
+                                    , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem itemKey) ] [ text "Remove" ]
                                     ]
 
                               else
