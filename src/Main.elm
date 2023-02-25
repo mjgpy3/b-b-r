@@ -765,8 +765,18 @@ eval schema turns expr key state currentPlayer =
                         |> firstError
                         |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
+                Op Sum [ Ref targetId ThisPlayer ] ->
+                    case key of
+                        NonPlayerKey _ -> "Found reference to this-player's " ++ targetId ++ "outside of player context!"|> Err
+                        PlayerKey p _ ->
+                            state.items
+                                |> List.filter (\i -> i.live)
+                                |> List.map (\i -> get (key |> keyWithItemNumber i.index |> keyWithId targetId) (state, schema))
+                                |> firstError
+                                |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
+
                 Op Sum _ ->
-                    Err "A sum must reference all players"
+                    Err "A sum must reference all players or a list"
 
                 Literal v ->
                     Ok v

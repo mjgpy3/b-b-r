@@ -113,7 +113,7 @@
           },
           {
             "type": "calculated",
-            "text": "Bucket Total",
+            "text": "Cash Total",
             "equals": {
               "type": "add",
               "ops": [
@@ -250,20 +250,20 @@
                 }
               ]
             }
+          },
+          {
+            "type": "calculated",
+            "text": "Check Total",
+            "equals": {
+              "type": "sum",
+              "of": {
+                "type": "ref",
+                "targetId": "check-amount",
+                "scope": "this-player"
+              }
+            }
           }
         ]
-      },
-      {
-        "type": "calculated",
-        "text": "Total Ones",
-        "equals": {
-          "type": "sum",
-          "of": {
-            "type": "ref",
-            "targetId": "ones",
-            "scope": "all-players"
-          }
-        }
       }
     ]
   }
