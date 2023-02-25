@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [9/30]
+* Items [10/31]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -27,9 +27,11 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** DONE Monies 
    CLOSED: [2023-02-22 Wed 00:00]
 ** TODO Stronger, earlier validation 
-** TODO Log compaction
+** DONE Log compaction
+   CLOSED: [2023-02-24 Fri 23:52]
 ** DONE Log "before" value 
    CLOSED: [2023-02-24 Fri 23:32]
+** TODO Logs should use fields ids 
 ** TODO Allow numeric fields to have a mix/min value
 ** DONE Hidden fields 
    CLOSED: [2023-02-23 Thu 23:46]

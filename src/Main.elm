@@ -172,7 +172,7 @@ update msg model =
         toState state =
             { schemaJson = model.schemaJson, url = model.url, state = state }
 
-        withLogs schema state players newLogs aliases =
+        log schema state players newLog aliases =
             let
                 oldLogs =
                     case model.state of
@@ -181,8 +181,32 @@ update msg model =
 
                         _ ->
                             []
+
+                newLogs =
+                    case newLog of
+                        Just l ->
+                            oldLogs ++ [ l ]
+
+                        Nothing ->
+                           oldLogs
+
+                compacted =
+                  if List.length newLogs <= 1
+                  then newLogs
+                  else
+                      let
+                          head = List.take (List.length newLogs - 2) newLogs
+                          tail = List.drop (List.length newLogs - 2) newLogs
+                          newTail =
+                              case tail of
+                                  [ValueUpdated a, ValueUpdated b] ->
+                                      if a.player == b.player && a.field == b.field
+                                      then [ValueUpdated { b | old=a.old }]
+                                      else tail
+                                  _ -> tail
+                      in head ++ newTail
             in
-            TrackerStage schema state players (oldLogs ++ newLogs) aliases |> toState
+            TrackerStage schema state players compacted aliases |> toState
     in
     case msg of
         Noop ->
@@ -196,7 +220,7 @@ update msg model =
                             turns =
                                 { currentPlayerTurn = 0, playerCount = players.maxPlayers }
                         in
-                        withLogs def Dict.empty turns [ GameStarted turns ] aliases
+                        log def Dict.empty turns (Just <| GameStarted turns) aliases
 
                     else
                         PlayerSelectionStage players.minPlayers players def aliases |> toState
@@ -206,7 +230,7 @@ update msg model =
                         turns =
                             { currentPlayerTurn = 0, playerCount = 1 }
                     in
-                    withLogs def Dict.empty turns [ GameStarted turns ] Dict.empty
+                    log def Dict.empty turns (Just <| GameStarted turns) Dict.empty
 
                 _ ->
                     BigError TooManyPlayerGroupsDefined |> toState
@@ -225,13 +249,13 @@ update msg model =
         TrackerMsg schema state turns aliases (ApplyEffects thisPlayer action effects) ->
             case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
                 Ok ( sc, st, ts ) ->
-                    withLogs sc st ts [ ActionPerformed thisPlayer action effects ] aliases
+                    log sc st ts (Just <| ActionPerformed thisPlayer action effects) aliases
 
                 Err e ->
                     BigError e |> toState
 
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
-            withLogs schema state turns [] (Dict.insert playerNumber newAlias aliases)
+            log schema state turns Nothing (Dict.insert playerNumber newAlias aliases)
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ _ "") ->
             model
@@ -252,7 +276,7 @@ update msg model =
                                 event =
                                     ValueUpdated { player = player, old = oldValue, new = num, field = field }
                             in
-                            withLogs schema (Dict.insert (key id player) num state) turns [ event ] aliases
+                            log schema (Dict.insert (key id player) num state) turns (Just <| event) aliases
 
                         Nothing ->
                             "Could not find old value for update" |> UnexpectedError |> BigError |> toState
@@ -267,7 +291,7 @@ update msg model =
                         turns =
                             { currentPlayerTurn = 0, playerCount = players }
                     in
-                    withLogs schema Dict.empty turns [ GameStarted turns ] aliases
+                    log schema Dict.empty turns (Just <| GameStarted turns) aliases
 
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
