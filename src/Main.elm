@@ -8,6 +8,8 @@ import Dict exposing (Dict)
 import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Html.Keyed as Keyed
+import Html.Lazy exposing (lazy)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
 import Json.Encode as E
 import Maybe exposing (Maybe)
@@ -109,6 +111,25 @@ keyWithPlayerNumber player key =
             PlayerKey player mul
 
 
+keyWithItemNumber : Int -> Key a -> Key a
+keyWithItemNumber item key =
+    let
+        underList mul =
+            case mul of
+                KeyUnderList _ v ->
+                    KeyUnderList item v
+
+                KeyNotUnderList v ->
+                    KeyUnderList item v
+    in
+    case key of
+        NonPlayerKey mul ->
+            mul |> underList |> NonPlayerKey
+
+        PlayerKey player mul ->
+            mul |> underList |> PlayerKey player
+
+
 keyWithId : String -> Key a -> Key String
 keyWithId id key =
     let
@@ -156,6 +177,7 @@ type alias MaybeUnderList =
 type alias TrackingState =
     { nonPlayer : MaybeUnderList
     , player : Dict Int MaybeUnderList
+    , items : List { index : Int, live : Bool }
     }
 
 
@@ -166,6 +188,7 @@ emptyState =
         , underList = Dict.empty
         }
     , player = Dict.empty
+    , items = []
     }
 
 
@@ -297,6 +320,8 @@ type TrackMsg
     = ApplyEffects (Key ()) String (List Effect)
     | SetWholeNumber Field (Key String) String
     | UpdatePlayerAlias Int String
+    | NewListItem (Key ()) Field
+    | RemoveListItem Int
 
 
 type Msg
@@ -416,6 +441,12 @@ update msg model =
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ "") ->
             model
+
+        TrackerMsg schema state turns aliases (NewListItem key field) ->
+            log schema { state | items = { live = True, index = List.length state.items } :: state.items } turns Nothing aliases
+
+        TrackerMsg schema state turns aliases (RemoveListItem index) ->
+            log schema { state | items = List.map (\item -> {item | live=item.index /= index && item.live }) state.items} turns Nothing aliases
 
         TrackerMsg schema state turns aliases (SetWholeNumber field key rawValue) ->
             case String.toInt rawValue of
@@ -818,7 +849,23 @@ viewTrackerComponent schema tracker state turns key aliases =
             div
                 [ style "border" "1px solid black"
                 ]
-                [ text s.text, button [{- onClick (ApplyEffects playerNumber s.text s.effects) -}] [ text "+" ] ]
+                [ div [] [ text s.text, button [ onClick (NewListItem key { id = s.id, text = s.text }) ] [ text "+" ] ]
+                , state.items
+                    |> List.map
+                        (\item ->
+                            ( String.fromInt item.index
+                            , if item.live then
+                                div []
+                                    [ viewTrackerComponent schema (Group { collapsed = Just False, items = s.items, text = Nothing }) state turns (keyWithItemNumber item.index key) aliases
+                                    , button [style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem item.index) ] [ text "Remove" ]
+                                    ]
+
+                              else
+                                text ""
+                            )
+                        )
+                    |> Keyed.node "div" []
+                ]
 
         Group s ->
             let

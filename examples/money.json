@@ -97,15 +97,15 @@
                 "id": "checks",
                 "items": [
                   {
-                    "type": "text",
-                    "text": "Note",
-                    "id": "note"
-                  },
-                  {
                     "type": "number",
                     "text": "Amount",
                     "default": 0,
                     "id": "check-amount"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Note",
+                    "id": "note"
                   }
                 ]
               }

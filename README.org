@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [14/35]
+* Items [15/36]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -40,7 +40,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-24 Fri 00:28]
 ** DONE Defaults should support floats
    CLOSED: [2023-02-24 Fri 00:34]
-** TODO Allow "add item" for item types (op wounds, checks, etc...) 
+** DONE Allow "add item" for item types (op wounds, checks, etc...) 
+   CLOSED: [2023-02-25 Sat 13:21]
 ** DONE Sum function 
    CLOSED: [2023-02-25 Sat 01:49]
 ** DONE Expandable sections
@@ -55,3 +56,4 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** DONE Text Field 
    CLOSED: [2023-02-25 Sat 10:01]
 ** TODO Override labels like "Player" and "Players" 
+** TODO Preview on edit screen 
