@@ -65,19 +65,45 @@
             "text": "Total VP",
             "equals": {
               "type": "add",
-                "ops": [
-                    {
-                        "type": "ref",
-                        "targetId": "primary-vp",
-                        "scope": "this-player"
-                    },
-                    {
-                        "type": "ref",
-                        "targetId": "secondary-vp",
-                        "scope": "this-player"
-                    }
-                ]
+              "ops": [
+                {
+                  "type": "ref",
+                  "targetId": "primary-vp",
+                  "scope": "this-player"
+                },
+                {
+                  "type": "ref",
+                  "targetId": "secondary-vp",
+                  "scope": "this-player"
+                }
+              ]
             }
+          },
+          {
+            "type": "group",
+            "text": "Operatives",
+            "collapsed": true,
+            "id": "operatives",
+            "items": [
+              {
+                "type": "item-list",
+                "text": "Operative",
+                "id": "operatives",
+                "items": [
+                  {
+                    "type": "text",
+                    "text": "Name",
+                    "id": "operative-name"
+                  },
+                  {
+                    "type": "number",
+                    "text": "Wounds",
+                    "default": 0,
+                    "id": "operative-wounds"
+                  }
+                ]
+              }
+            ]
           }
         ]
       }

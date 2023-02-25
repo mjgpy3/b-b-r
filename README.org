@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [15/36]
+* Items [16/36]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -21,8 +21,10 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Regression tests
 ** DONE Base64 URLs
    CLOSED: [2023-02-21 Tue 21:20]
-** TODO Kill team improvements [0/1]
-*** TODO Way to track wounds 
+** DONE Kill team improvements [1/1]
+   CLOSED: [2023-02-25 Sat 13:21]
+*** DONE Way to track wounds 
+    CLOSED: [2023-02-25 Sat 13:21]
 ** TODO Start more complicated case 
 ** DONE Monies 
    CLOSED: [2023-02-22 Wed 00:00]
