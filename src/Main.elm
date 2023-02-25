@@ -117,10 +117,14 @@ type Error
     | UnexpectedError String
 
 
+type alias Field =
+    { id : String, text : String }
+
+
 type Log
     = GameStarted Turns
     | ActionPerformed (Maybe Int) String (List Effect)
-    | ValueUpdated { player : Maybe Int, old : Value, new : Value, field : String }
+    | ValueUpdated { player : Maybe Int, old : Value, new : Value, field : Field }
 
 
 type alias PlayerAliases =
@@ -152,7 +156,7 @@ init url =
 
 type TrackMsg
     = ApplyEffects (Maybe Int) String (List Effect)
-    | SetWholeNumber String String (Maybe Int) String
+    | SetWholeNumber Field (Maybe Int) String
     | UpdatePlayerAlias Int String
 
 
@@ -188,26 +192,37 @@ update msg model =
                             oldLogs ++ [ l ]
 
                         Nothing ->
-                           oldLogs
+                            oldLogs
 
                 compacted =
-                  if List.length newLogs <= 1
-                  then newLogs
-                  else
-                      let
-                          head = List.take (List.length newLogs - 2) newLogs
-                          tail = List.drop (List.length newLogs - 2) newLogs
-                          newTail =
-                              case tail of
-                                  [ValueUpdated a, ValueUpdated b] ->
-                                      if a.player == b.player && a.field == b.field
-                                      then
-                                          if b.new == a.old
-                                          then []
-                                          else [ValueUpdated { b | old=a.old }]
-                                      else tail
-                                  _ -> tail
-                      in head ++ newTail
+                    if List.length newLogs <= 1 then
+                        newLogs
+
+                    else
+                        let
+                            head =
+                                List.take (List.length newLogs - 2) newLogs
+
+                            tail =
+                                List.drop (List.length newLogs - 2) newLogs
+
+                            newTail =
+                                case tail of
+                                    [ ValueUpdated a, ValueUpdated b ] ->
+                                        if a.player == b.player && a.field == b.field then
+                                            if b.new == a.old then
+                                                []
+
+                                            else
+                                                [ ValueUpdated { b | old = a.old } ]
+
+                                        else
+                                            tail
+
+                                    _ ->
+                                        tail
+                        in
+                        head ++ newTail
             in
             TrackerStage schema state players compacted aliases |> toState
     in
@@ -260,28 +275,30 @@ update msg model =
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
             log schema state turns Nothing (Dict.insert playerNumber newAlias aliases)
 
-        TrackerMsg _ _ _ _ (SetWholeNumber _ _ _ "") ->
+        TrackerMsg _ _ _ _ (SetWholeNumber _ _ "") ->
             model
 
-        TrackerMsg schema state turns aliases (SetWholeNumber id field player rawValue) ->
+        TrackerMsg schema state turns aliases (SetWholeNumber field player rawValue) ->
             case String.toInt rawValue of
                 Just v ->
                     let
                         num =
                             WholeNumber v
                     in
-                    case idDefault id schema.tracker of
+                    case idDefault field.id schema.tracker of
                         Just default ->
                             let
                                 oldValue =
-                                    state |> Dict.get (key id player) |> Maybe.withDefault (lookupDefault default player)
+                                    state |> Dict.get (key field.id player) |> Maybe.withDefault (lookupDefault default player)
 
                                 event =
                                     ValueUpdated { player = player, old = oldValue, new = num, field = field }
                             in
-                            if oldValue == num
-                            then model
-                            else log schema (Dict.insert (key id player) num state) turns (Just <| event) aliases
+                            if oldValue == num then
+                                model
+
+                            else
+                                log schema (Dict.insert (key field.id player) num state) turns (Just <| event) aliases
 
                         Nothing ->
                             "Could not find old value for update" |> UnexpectedError |> BigError |> toState
@@ -477,10 +494,10 @@ viewLog aliases log =
             ValueUpdated s ->
                 case s.player of
                     Nothing ->
-                        text (s.field ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
+                        text (s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
 
                     Just player ->
-                        text (playerName player aliases ++ "'s " ++ s.field ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
+                        text (playerName player aliases ++ "'s " ++ s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
         ]
 
 
@@ -611,7 +628,7 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                         text v
 
                       else
-                        input [ type_ "number", onInput (SetWholeNumber s.id s.text playerNumber), value v ] []
+                        input [ type_ "number", onInput (SetWholeNumber { id = s.id, text = s.text } playerNumber), value v ] []
                     ]
 
         Calculated s ->

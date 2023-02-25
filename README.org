@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [10/31]
+* Items [11/31]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -31,7 +31,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-24 Fri 23:52]
 ** DONE Log "before" value 
    CLOSED: [2023-02-24 Fri 23:32]
-** TODO Logs should use fields ids 
+** DONE Logs should use fields ids 
+   CLOSED: [2023-02-25 Sat 00:34]
 ** TODO Allow numeric fields to have a mix/min value
 ** DONE Hidden fields 
    CLOSED: [2023-02-23 Thu 23:46]
