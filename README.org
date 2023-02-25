@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [12/31]
+* Items [12/32]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -49,3 +49,4 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Way to spawn similar fields (e.g. foreach, dhall?) 
 ** TODO Calculated fields referencing calculated fields 
 ** TODO Allow errors to return to tracking 
+** TODO Allow to disable turns

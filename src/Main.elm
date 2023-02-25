@@ -655,7 +655,7 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
 
                 group content =
                     div
-                        [style "border" "1px solid black"]
+                        [style "border" "1px solid black", style "margin-left" "1rem"]
                         [
                           if collapses
                           then details [] ( summary [] [header] :: content)
