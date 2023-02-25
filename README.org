@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [14/34]
+* Items [14/35]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
 ** TODO Then effect-level history 
@@ -54,3 +54,4 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Make visual of how scopes work 
 ** DONE Text Field 
    CLOSED: [2023-02-25 Sat 10:01]
+** TODO Override labels like "Player" and "Players" 

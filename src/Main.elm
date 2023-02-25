@@ -5,7 +5,7 @@ import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, a, button, div, h1, h2, hr, i, input, pre, text, textarea, b, details, summary)
+import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
@@ -84,25 +84,161 @@ valueToString v =
             String.fromFloat n
 
 
+type KeyMaybeUnderList v
+    = KeyUnderList Int v
+    | KeyNotUnderList v
+
+
+type Key v
+    = NonPlayerKey (KeyMaybeUnderList v)
+    | PlayerKey Int (KeyMaybeUnderList v)
+
+
+emptyKey : Key ()
+emptyKey =
+    () |> KeyNotUnderList |> NonPlayerKey
+
+
+keyWithPlayerNumber : Int -> Key a -> Key a
+keyWithPlayerNumber player key =
+    case key of
+        NonPlayerKey mul ->
+            PlayerKey player mul
+
+        PlayerKey _ mul ->
+            PlayerKey player mul
+
+
+keyWithId : String -> Key a -> Key String
+keyWithId id key =
+    let
+        withId mul =
+            case mul of
+                KeyUnderList l _ ->
+                    KeyUnderList l id
+
+                KeyNotUnderList _ ->
+                    KeyNotUnderList id
+    in
+    case key of
+        NonPlayerKey mul ->
+            mul |> withId |> NonPlayerKey
+
+        PlayerKey player mul ->
+            mul |> withId |> PlayerKey player
+
+
+schemaId : Key a -> a
+schemaId key =
+    let
+        idUnderList mul =
+            case mul of
+                KeyUnderList _ id ->
+                    id
+
+                KeyNotUnderList id ->
+                    id
+    in
+    case key of
+        NonPlayerKey mul ->
+            idUnderList mul
+
+        PlayerKey _ mul ->
+            idUnderList mul
+
+
+type alias MaybeUnderList =
+    { notUnderList : Dict String Value
+    , underList : Dict Int (Dict String Value)
+    }
+
+
 type alias TrackingState =
-    Dict String Value
+    { nonPlayer : MaybeUnderList
+    , player : Dict Int MaybeUnderList
+    }
 
 
+emptyState : TrackingState
+emptyState =
+    { nonPlayer =
+        { notUnderList = Dict.empty
+        , underList = Dict.empty
+        }
+    , player = Dict.empty
+    }
 
--- Key for id and perhaps player
+
+set : Key String -> Value -> TrackingState -> TrackingState
+set key value state =
+    let
+        setInner id dict =
+            case dict of
+                Nothing ->
+                    Dict.singleton id value
+
+                Just d ->
+                    Dict.insert id value d
+
+        setMul mulKey mul =
+            case ( mulKey, mul ) of
+                ( KeyNotUnderList id, Nothing ) ->
+                    { underList = Dict.empty, notUnderList = Dict.singleton id value }
+
+                ( KeyNotUnderList id, Just s ) ->
+                    { s | notUnderList = Dict.insert id value s.notUnderList }
+
+                ( KeyUnderList idx id, Nothing ) ->
+                    { notUnderList = Dict.empty, underList = Dict.singleton idx (Dict.singleton id value) }
+
+                ( KeyUnderList idx id, Just s ) ->
+                    { s | underList = Dict.update idx (setInner id >> Just) s.underList }
+    in
+    case key of
+        NonPlayerKey mulKey ->
+            { state | nonPlayer = setMul mulKey (Just state.nonPlayer) }
+
+        PlayerKey p mulKey ->
+            { state | player = Dict.update p (setMul mulKey >> Just) state.player }
 
 
-key : String -> Maybe Int -> String
-key id player =
-    case player of
-        Just p ->
-            "player_" ++ String.fromInt p ++ "_" ++ id
-
+get : Key String -> ( TrackingState, TrackerTopLevelSchema ) -> Result String Value
+get key ( state, schema ) =
+    case idDefault (schemaId key) schema.tracker of
         Nothing ->
-            id
+            "Could not find default for ID " ++ schemaId key |> Err
+
+        Just default ->
+            let
+                lookupMul mulKey mul =
+                    case mulKey of
+                        KeyNotUnderList id ->
+                            Dict.get id mul.notUnderList
+
+                        KeyUnderList idx id ->
+                            Dict.get idx mul.underList |> Maybe.andThen (Dict.get id)
+
+                current =
+                    case key of
+                        NonPlayerKey mulKey ->
+                            lookupMul mulKey state.nonPlayer
+
+                        PlayerKey player mulKey ->
+                            case Dict.get player state.player of
+                                Nothing ->
+                                    Nothing
+
+                                Just next ->
+                                    lookupMul mulKey next
+            in
+            current
+                |> Maybe.withDefault (lookupDefault default key)
+                |> Ok
+
 
 playerIds : Turns -> List Int
-playerIds turns = List.range 0 (turns.playerCount - 1)
+playerIds turns =
+    List.range 0 (turns.playerCount - 1)
 
 
 type alias Turns =
@@ -126,8 +262,8 @@ type alias Field =
 
 type Log
     = GameStarted Turns
-    | ActionPerformed (Maybe Int) String (List Effect)
-    | ValueUpdated { player : Maybe Int, old : Value, new : Value, field : Field }
+    | ActionPerformed (Key ()) String (List Effect)
+    | ValueUpdated { key : Key String, old : Value, new : Value, field : Field }
 
 
 type alias PlayerAliases =
@@ -158,8 +294,8 @@ init url =
 
 
 type TrackMsg
-    = ApplyEffects (Maybe Int) String (List Effect)
-    | SetWholeNumber Field (Maybe Int) String
+    = ApplyEffects (Key ()) String (List Effect)
+    | SetWholeNumber Field (Key String) String
     | UpdatePlayerAlias Int String
 
 
@@ -212,7 +348,7 @@ update msg model =
                             newTail =
                                 case tail of
                                     [ ValueUpdated a, ValueUpdated b ] ->
-                                        if a.player == b.player && a.field == b.field then
+                                        if a.key == b.key && a.field == b.field then
                                             if b.new == a.old then
                                                 []
 
@@ -241,7 +377,7 @@ update msg model =
                             turns =
                                 { currentPlayerTurn = 0, playerCount = players.maxPlayers }
                         in
-                        log def Dict.empty turns (Just <| GameStarted turns) aliases
+                        log def emptyState turns (Just <| GameStarted turns) aliases
 
                     else
                         PlayerSelectionStage players.minPlayers players def aliases |> toState
@@ -251,7 +387,7 @@ update msg model =
                         turns =
                             { currentPlayerTurn = 0, playerCount = 1 }
                     in
-                    log def Dict.empty turns (Just <| GameStarted turns) Dict.empty
+                    log def emptyState turns (Just <| GameStarted turns) Dict.empty
 
                 _ ->
                     BigError TooManyPlayerGroupsDefined |> toState
@@ -267,10 +403,10 @@ update msg model =
         MoveToEdit ->
             DefinitionStage StartingOut |> toState
 
-        TrackerMsg schema state turns aliases (ApplyEffects thisPlayer action effects) ->
-            case List.foldl (applyEffect thisPlayer) (Ok ( schema, state, turns )) effects of
+        TrackerMsg schema state turns aliases (ApplyEffects key action effects) ->
+            case List.foldl (applyEffect key) (Ok ( schema, state, turns )) effects of
                 Ok ( sc, st, ts ) ->
-                    log sc st ts (Just <| ActionPerformed thisPlayer action effects) aliases
+                    log sc st ts (Just <| ActionPerformed key action effects) aliases
 
                 Err e ->
                     BigError e |> toState
@@ -281,30 +417,27 @@ update msg model =
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ "") ->
             model
 
-        TrackerMsg schema state turns aliases (SetWholeNumber field player rawValue) ->
+        TrackerMsg schema state turns aliases (SetWholeNumber field key rawValue) ->
             case String.toInt rawValue of
                 Just v ->
                     let
                         num =
                             WholeNumber v
                     in
-                    case idDefault field.id schema.tracker of
-                        Just default ->
+                    case get key ( state, schema ) of
+                        Ok oldValue ->
                             let
-                                oldValue =
-                                    state |> Dict.get (key field.id player) |> Maybe.withDefault (lookupDefault default player)
-
                                 event =
-                                    ValueUpdated { player = player, old = oldValue, new = num, field = field }
+                                    ValueUpdated { key = key, old = oldValue, new = num, field = field }
                             in
                             if oldValue == num then
                                 model
 
                             else
-                                log schema (Dict.insert (key field.id player) num state) turns (Just <| event) aliases
+                                log schema (set key num state) turns (Just <| event) aliases
 
-                        Nothing ->
-                            "Could not find old value for update" |> UnexpectedError |> BigError |> toState
+                        Err e ->
+                            e |> UnexpectedError |> BigError |> toState
 
                 Nothing ->
                     CouldNotParseWholeNumber rawValue |> BigError |> toState
@@ -316,7 +449,7 @@ update msg model =
                         turns =
                             { currentPlayerTurn = 0, playerCount = players }
                     in
-                    log schema Dict.empty turns (Just <| GameStarted turns) aliases
+                    log schema emptyState turns (Just <| GameStarted turns) aliases
 
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
@@ -334,8 +467,8 @@ update msg model =
                     BigError CouldNotReadNumberOfPlayers |> toState
 
 
-applyEffect : Maybe Int -> Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
-applyEffect thisPlayer eff result =
+applyEffect : Key a -> Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
+applyEffect key eff result =
     case result of
         Err e ->
             Err e
@@ -346,60 +479,67 @@ applyEffect thisPlayer eff result =
                     Ok ( schema, state, { turns | currentPlayerTurn = modBy turns.playerCount (turns.currentPlayerTurn + 1) } )
 
                 SetCurrentPlayer CurrentIsThisPlayer ->
-                    case thisPlayer of
-                        Just player ->
+                    case key of
+                        PlayerKey player _ ->
                             Ok ( schema, state, { turns | currentPlayerTurn = player } )
 
-                        Nothing ->
+                        _ ->
                             Err CannotSetCurrentPlayerToThisWithEffectsOutsideContext
 
                 OnCells op targetId scope ->
                     let
-                        scopedKeys =
+                        keys =
                             case scope of
                                 NonPlayer ->
-                                    [ ( Nothing, targetId ) ]
+                                    [ targetId |> KeyNotUnderList |> NonPlayerKey ]
 
                                 CurrentPlayer ->
-                                    [ ( Just turns.currentPlayerTurn, key targetId (Just turns.currentPlayerTurn) ) ]
+                                    [ targetId |> KeyNotUnderList |> PlayerKey turns.currentPlayerTurn ]
 
                                 SpecificPlayer p ->
-                                    [ ( Just p, key targetId (Just p) ) ]
+                                    [ targetId |> KeyNotUnderList |> PlayerKey p ]
 
                                 AllPlayers ->
-                                    playerIds turns |> List.map (\i -> ( Just i, key targetId (Just i) ))
+                                    playerIds turns |> List.map (\p -> targetId |> KeyNotUnderList |> PlayerKey p)
 
                                 ThisPlayer ->
-                                    playerIds turns |> List.map (\i -> ( Just i, key targetId (Just i) ))
+                                    case key of
+                                        PlayerKey p _ ->
+                                            [ targetId |> KeyNotUnderList |> PlayerKey p ]
+
+                                        NonPlayerKey _ ->
+                                            []
                     in
                     case idDefault targetId schema.tracker of
                         Just default ->
                             let
-                                newValue player currentValue =
+                                newValue k currentValue =
                                     case ( op, currentValue ) of
                                         ( RestoreDefault, _ ) ->
-                                            lookupDefault default player |> Ok
+                                            lookupDefault default k
 
                                         ( Adjust (WholeNumber amount), WholeNumber v ) ->
-                                            v + amount |> WholeNumber |> Ok
+                                            v + amount |> WholeNumber
 
                                         ( Adjust (DecimalNumber amount), DecimalNumber v ) ->
-                                            v + amount |> DecimalNumber |> Ok
+                                            v + amount |> DecimalNumber
 
                                         ( Adjust (WholeNumber amount), DecimalNumber v ) ->
-                                            v + toFloat amount |> DecimalNumber |> Ok
+                                            v + toFloat amount |> DecimalNumber
 
                                         ( Adjust (DecimalNumber amount), WholeNumber v ) ->
-                                            toFloat v + amount |> DecimalNumber |> Ok
+                                            toFloat v + amount |> DecimalNumber
 
-                                apply ( player, scopedKey ) res =
+                                apply k res =
                                     res
                                         |> Result.andThen
                                             (\( sc, st, tu ) ->
-                                                newValue player (Maybe.withDefault (lookupDefault default player) (Dict.get scopedKey st)) |> Result.map (\v -> ( sc, Dict.insert scopedKey v st, tu ))
+                                                get k ( st, schema )
+                                                    |> Result.mapError UnexpectedError
+                                                    |> Result.map (\currentValue -> ( sc, set k (newValue k currentValue) st, tu ))
                                             )
                             in
-                            List.foldl apply (Ok ( schema, state, turns )) scopedKeys
+                            List.foldl apply (Ok ( schema, state, turns )) keys
 
                         Nothing ->
                             Err <| ComponentIdNotFound scope targetId
@@ -485,18 +625,18 @@ viewLog aliases log =
                 else
                     text "Game started"
 
-            ActionPerformed (Just player) action _ ->
+            ActionPerformed (PlayerKey player _) action _ ->
                 text (playerName player aliases ++ " " ++ action)
 
-            ActionPerformed Nothing action _ ->
+            ActionPerformed (NonPlayerKey _) action _ ->
                 text action
 
             ValueUpdated s ->
-                case s.player of
-                    Nothing ->
+                case s.key of
+                    NonPlayerKey _ ->
                         text (s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
 
-                    Just player ->
+                    PlayerKey player _ ->
                         text (playerName player aliases ++ "'s " ++ s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
         ]
 
@@ -512,7 +652,7 @@ viewPlayerSelection players { minPlayers, maxPlayers } schema =
 
 makeUrl : String -> String -> Url -> Html Msg
 makeUrl qp def url =
-    a [ { url | query = qp ++ "=" ++ Url.percentEncode (Base64E.encode (Base64E.string def)) |> Just } |> Url.toString |> href ] [ "URL to " ++ qp |> text ]
+    a [ { url | query = qp ++ "=" ++ Url.percentEncode (Base64E.encode (Base64E.string def)) |> Just } |> Url.toString |> href, target "_blank" ] [ "URL to " ++ qp |> text ]
 
 
 viewEditTracker : String -> Url -> DefinitionValidity -> Html Msg
@@ -538,21 +678,33 @@ viewEditTracker def url valid =
         , div [] [ makeUrl "edit" def url ]
         ]
 
+
 firstError : List (Result e v) -> Result e (List v)
 firstError vs =
     case vs of
-        [] -> Ok []
-        res::ress -> res |> Result.andThen (\v -> Result.map ((::) v) <| firstError ress)
+        [] ->
+            Ok []
 
-eval : TrackerTopLevelSchema -> Turns -> Expression -> Maybe Int -> TrackingState -> Int -> Result String Value
-eval schema turns expr thisPlayer state currentPlayer =
+        res :: ress ->
+            res |> Result.andThen (\v -> Result.map ((::) v) <| firstError ress)
+
+
+eval : TrackerTopLevelSchema -> Turns -> Expression -> Key () -> TrackingState -> Int -> Result String Value
+eval schema turns expr key state currentPlayer =
     let
         append oInt oFloat x y =
-            case (x, y) of
-                (WholeNumber a, WholeNumber b) -> oInt a b |> WholeNumber
-                (WholeNumber a, DecimalNumber b) -> oFloat (toFloat a)  b |> DecimalNumber
-                (DecimalNumber a, DecimalNumber b) -> oFloat a b |> DecimalNumber
-                (DecimalNumber a, WholeNumber b) -> oFloat a (toFloat b) |> DecimalNumber
+            case ( x, y ) of
+                ( WholeNumber a, WholeNumber b ) ->
+                    oInt a b |> WholeNumber
+
+                ( WholeNumber a, DecimalNumber b ) ->
+                    oFloat (toFloat a) b |> DecimalNumber
+
+                ( DecimalNumber a, DecimalNumber b ) ->
+                    oFloat a b |> DecimalNumber
+
+                ( DecimalNumber a, WholeNumber b ) ->
+                    oFloat a (toFloat b) |> DecimalNumber
 
         op oInt oFloat a b =
             case b of
@@ -575,7 +727,7 @@ eval schema turns expr thisPlayer state currentPlayer =
                 Op Mul ops ->
                     List.foldl (op (\a b -> a * b) (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
 
-                Op Sum [Ref targetId AllPlayers] ->
+                Op Sum [ Ref targetId AllPlayers ] ->
                     turns
                         |> playerIds
                         |> List.map (SpecificPlayer >> Ref targetId >> aux)
@@ -590,38 +742,33 @@ eval schema turns expr thisPlayer state currentPlayer =
 
                 Ref targetId scope ->
                     let
-                        player =
-                            case ( scope, thisPlayer ) of
+                        refKey =
+                            case ( scope, key ) of
                                 ( NonPlayer, _ ) ->
-                                    Ok Nothing
+                                    targetId |> KeyNotUnderList |> NonPlayerKey |> Ok
 
                                 ( CurrentPlayer, _ ) ->
-                                    Ok (Just currentPlayer)
+                                    targetId |> KeyNotUnderList |> PlayerKey currentPlayer |> Ok
 
                                 ( SpecificPlayer p, _ ) ->
-                                    Ok (Just p)
+                                    targetId |> KeyNotUnderList |> PlayerKey p |> Ok
 
                                 ( AllPlayers, _ ) ->
                                     Err "Calculated fields cannot reference all players"
 
-                                ( ThisPlayer, Just this ) ->
-                                    Ok (Just this)
+                                ( ThisPlayer, PlayerKey this _ ) ->
+                                    targetId |> KeyNotUnderList |> PlayerKey this |> Ok
 
-                                ( ThisPlayer, Nothing ) ->
+                                ( ThisPlayer, NonPlayerKey _ ) ->
                                     Err "Referenced this player, but couldn't find them"
                     in
-                    case idDefault targetId schema.tracker of
-                        Just default ->
-                            player |> Result.map (\p -> Maybe.withDefault (lookupDefault default p) (Dict.get (key targetId p) state))
-
-                        Nothing ->
-                            Err ("Could not find identifier " ++ targetId ++ " anywhere")
+                    refKey |> Result.andThen (\k -> get k ( state, schema ))
     in
     aux expr
 
 
-viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Maybe Int -> PlayerAliases -> Html TrackMsg
-viewTrackerComponent schema tracker state turns playerNumber aliases =
+viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Key () -> PlayerAliases -> Html TrackMsg
+viewTrackerComponent schema tracker state turns key aliases =
     case tracker of
         TextSchema s ->
             div []
@@ -636,8 +783,11 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
 
             else
                 let
+                    numberKey =
+                        keyWithId s.id key
+
                     v =
-                        valueToString <| Maybe.withDefault (lookupDefault s.default playerNumber) (Dict.get (key s.id playerNumber) state)
+                        valueToString <| Result.withDefault (lookupDefault s.default key) (get numberKey ( state, schema ))
                 in
                 div []
                     [ text s.text
@@ -646,14 +796,14 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                         text v
 
                       else
-                        input [ type_ "number", onInput (SetWholeNumber { id = s.id, text = s.text } playerNumber), value v ] []
+                        input [ type_ "number", onInput (SetWholeNumber { id = s.id, text = s.text } numberKey), value v ] []
                     ]
 
         Calculated s ->
             div []
                 [ text s.text
                 , text " "
-                , case eval schema turns s.equals playerNumber state turns.currentPlayerTurn of
+                , case eval schema turns s.equals key state turns.currentPlayerTurn of
                     Ok (WholeNumber v) ->
                         v |> String.fromInt |> text
 
@@ -664,29 +814,42 @@ viewTrackerComponent schema tracker state turns playerNumber aliases =
                         text ("Error: " ++ e)
                 ]
 
+        ItemList s ->
+            div
+                [ style "border" "1px solid black"
+                ]
+                [ text s.text, button [{- onClick (ApplyEffects playerNumber s.text s.effects) -}] [ text "+" ] ]
+
         Group s ->
             let
-                collapses = s.collapsed == Just True
-                header = case s.text of
-                           Just t -> div [] [b [] [text t]]
-                           Nothing -> div [] []
+                collapses =
+                    s.collapsed == Just True
+
+                header =
+                    case s.text of
+                        Just t ->
+                            div [] [ b [] [ text t ] ]
+
+                        Nothing ->
+                            div [] []
 
                 group content =
                     div
-                        [style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem"]
-                        [
-                          if collapses
-                          then details [] ( summary [] [header] :: content)
-                          else div [] content
+                        [ style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem" ]
+                        [ if collapses then
+                            details [] (summary [] [ header ] :: content)
+
+                          else
+                            div [] content
                         ]
             in
-                s.items |> List.map (\i -> viewTrackerComponent schema i state turns playerNumber aliases) |> group
+            s.items |> List.map (\i -> viewTrackerComponent schema i state turns key aliases) |> group
 
         PlayerGroup s ->
-            playerIds turns |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed=Nothing, text=Nothing }) state turns (Just i) aliases ]) |> div []
+            playerIds turns |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed = Nothing, text = Nothing }) state turns (keyWithPlayerNumber i key) aliases ]) |> div []
 
         Action s ->
-            button [ onClick (ApplyEffects playerNumber s.text s.effects) ] [ text s.text ]
+            button [ onClick (ApplyEffects key s.text s.effects) ] [ text s.text ]
 
 
 playerName : Int -> PlayerAliases -> String
@@ -713,7 +876,7 @@ viewTracker : TrackerTopLevelSchema -> TrackingState -> Turns -> PlayerAliases -
 viewTracker schema state turns aliases =
     div []
         [ h1 [] [ text schema.name ]
-        , Html.map (TrackerMsg schema state turns aliases) <| viewTrackerComponent schema schema.tracker state turns Nothing aliases
+        , Html.map (TrackerMsg schema state turns aliases) <| viewTrackerComponent schema schema.tracker state turns emptyKey aliases
         ]
 
 
@@ -814,7 +977,7 @@ playerGroupDecoder =
 
 groupDecoder : Decoder TrackerSchema
 groupDecoder =
-    Decode.map3 (\items collapsed text -> Group { items = items, collapsed=collapsed, text=text })
+    Decode.map3 (\items collapsed text -> Group { items = items, collapsed = collapsed, text = text })
         (field "items" (Decode.list trackerSchemaDecoder))
         (Decode.maybe (field "collapsed" Decode.bool))
         (Decode.maybe (field "text" Decode.string))
@@ -832,9 +995,11 @@ opDecoder : Operator -> Decoder Expression
 opDecoder op =
     Decode.map (\ops -> Op op ops) (field "ops" (Decode.list expressionDecoder))
 
+
 sumDecoder : Decoder Expression
 sumDecoder =
-    Decode.map (\op -> Op Sum [op]) (field "of" expressionDecoder)
+    Decode.map (\op -> Op Sum [ op ]) (field "of" expressionDecoder)
+
 
 refDecoder : Decoder Expression
 refDecoder =
@@ -896,6 +1061,7 @@ wholeNumberDecoder =
         (Decode.maybe (field "hidden" Decode.bool))
         (Decode.map (Maybe.withDefault Dict.empty) <| Decode.maybe playerDefaultsDecoder)
 
+
 textDecoder : Decoder TrackerSchema
 textDecoder =
     Decode.map2
@@ -903,12 +1069,22 @@ textDecoder =
         (field "text" string)
         (field "id" string)
 
+
 calculatedDecoder : Decoder TrackerSchema
 calculatedDecoder =
     Decode.map2
         (\text equals -> Calculated { text = text, equals = equals })
         (field "text" string)
         (field "equals" expressionDecoder)
+
+
+itemListDecoder : Decoder TrackerSchema
+itemListDecoder =
+    Decode.map3
+        (\text id items -> ItemList { text = text, id = id, items = items })
+        (field "text" string)
+        (field "id" string)
+        (field "items" (Decode.list trackerSchemaDecoder))
 
 
 specificTrackerSchemaDecoder : String -> Decoder TrackerSchema
@@ -932,6 +1108,9 @@ specificTrackerSchemaDecoder ty =
         "calculated" ->
             calculatedDecoder
 
+        "item-list" ->
+            itemListDecoder
+
         _ ->
             Decode.fail (ty ++ " is not a valid tracker component type")
 
@@ -953,13 +1132,13 @@ type Expression
     | Literal Value
 
 
-lookupDefault : Defaults -> Maybe Int -> Value
-lookupDefault defaults player =
-    case player of
-        Just p ->
+lookupDefault : Defaults -> Key a -> Value
+lookupDefault defaults key =
+    case key of
+        PlayerKey p _ ->
             defaults.playerDefaults |> Dict.get p |> Maybe.withDefault defaults.default
 
-        Nothing ->
+        NonPlayerKey _ ->
             defaults.default
 
 
@@ -969,11 +1148,12 @@ type alias Defaults =
 
 type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
-    | Group { items : List TrackerSchema, collapsed: Maybe Bool, text : Maybe String }
+    | Group { items : List TrackerSchema, collapsed : Maybe Bool, text : Maybe String }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool }
-    | TextSchema { text : String, id: String }
+    | TextSchema { text : String, id : String }
     | Calculated { text : String, equals : Expression }
+    | ItemList { text : String, id : String, items : List TrackerSchema }
 
 
 newPlayerAliases : List String -> PlayerAliases
@@ -988,6 +1168,10 @@ findPlayerGroup schema =
             []
 
         TextSchema s ->
+            []
+
+        -- Allowing users to put a player group in here is a bad idea
+        ItemList s ->
             []
 
         Group s ->
@@ -1006,7 +1190,8 @@ findPlayerGroup schema =
 idDefault : String -> TrackerSchema -> Maybe Defaults
 idDefault id schema =
     case schema of
-        TextSchema s -> Nothing
+        TextSchema s ->
+            Nothing
 
         WholeNumberSchema s ->
             if s.id == id then
@@ -1016,6 +1201,9 @@ idDefault id schema =
                 Nothing
 
         Group s ->
+            List.head <| List.filterMap (idDefault id) s.items
+
+        ItemList s ->
             List.head <| List.filterMap (idDefault id) s.items
 
         PlayerGroup s ->

@@ -87,6 +87,31 @@
             ]
           },
           {
+            "type": "group",
+            "collapsed": true,
+            "text": "Checks",
+            "items": [
+              {
+                "type": "item-list",
+                "text": "Check",
+                "id": "checks",
+                "items": [
+                  {
+                    "type": "text",
+                    "text": "Note",
+                    "id": "note"
+                  },
+                  {
+                    "type": "number",
+                    "text": "Amount",
+                    "default": 0,
+                    "id": "check-amount"
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "type": "calculated",
             "text": "Bucket Total",
             "equals": {
