@@ -4,6 +4,7 @@ import Base64.Decode as Base64D
 import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
+import Array exposing (Array)
 import Dict exposing (Dict)
 import Html exposing (Html, a, b, button, details, div, h1, hr, i, input, pre, summary, text, textarea, span)
 import Html.Attributes exposing (..)
@@ -168,14 +169,16 @@ schemaId key =
             idUnderList mul
 
 
+type alias ListItem = { index : Int, live : Bool, text : String }
+
 type alias MaybeUnderList =
     { notUnderList : Dict String Value
     , underList : Dict Int (Dict String Value)
-    , listItems : List { index : Int, live : Bool }
+    , listItems : Array ListItem
     }
 
 
-listItems : Key String -> TrackingState -> List { index : Int, live : Bool }
+listItems : Key String -> TrackingState -> Array ListItem
 listItems key state =
     case key of
         NonPlayerKey _ ->
@@ -185,7 +188,7 @@ listItems key state =
             state.player
                 |> Dict.get p
                 |> Maybe.map .listItems
-                |> Maybe.withDefault []
+                |> Maybe.withDefault Array.empty
 
 
 type alias TrackingState =
@@ -193,11 +196,44 @@ type alias TrackingState =
     , player : Dict Int MaybeUnderList
     }
 
+arrayUpdate : Int -> (a -> a) -> Array a -> Array a
+arrayUpdate idx f vs =
+    case Array.get idx vs of
+        Just v -> Array.set idx (f v) vs
+        Nothing -> vs
+
+setItemText : Key () -> String -> TrackingState -> TrackingState
+setItemText key text state =
+    let
+        setText item = {item | text = text}
+    in
+    case key of
+        PlayerKey p (KeyUnderList idx _) ->
+            {
+              state |
+              player = Dict.update p (Maybe.withDefault emptyMul >> (\s -> {s | listItems=arrayUpdate idx setText s.listItems }) >> Just) state.player
+            }
+        NonPlayerKey (KeyUnderList idx _) ->
+            let np = state.nonPlayer
+            in
+              {state | nonPlayer={ np | listItems=arrayUpdate idx setText np.listItems } }
+        PlayerKey _ (KeyNotUnderList _) -> state
+        NonPlayerKey (KeyNotUnderList _) -> state
+
+getItemText : Key a -> TrackingState -> Maybe String
+getItemText key state =
+    case key of
+        PlayerKey p (KeyUnderList idx _) ->
+            state.player |> Dict.get p |> Maybe.map .listItems |> Maybe.andThen (Array.get idx) |> Maybe.map .text
+        NonPlayerKey (KeyUnderList idx _) ->
+            state.nonPlayer.listItems |> Array.get idx |> Maybe.map .text
+        PlayerKey _ (KeyNotUnderList _) -> Nothing
+        NonPlayerKey (KeyNotUnderList _) -> Nothing
 
 emptyMul =
     { notUnderList = Dict.empty
     , underList = Dict.empty
-    , listItems = []
+    , listItems = Array.empty
     }
 
 
@@ -206,7 +242,7 @@ emptyState =
     { nonPlayer =
         { notUnderList = Dict.empty
         , underList = Dict.empty
-        , listItems = []
+        , listItems = Array.empty
         }
     , player = Dict.empty
     }
@@ -218,7 +254,7 @@ removeItem key state =
         removeListItem idx mul =
             case mul of
                 Just m ->
-                    { m | listItems = List.map (\item -> { item | live = item.live && item.index /= idx }) m.listItems }
+                    { m | listItems = Array.map (\item -> { item | live = item.live && item.index /= idx }) m.listItems }
 
                 Nothing ->
                     emptyMul
@@ -241,7 +277,7 @@ addItem : Key k -> TrackingState -> TrackingState
 addItem key state =
     let
         addTo items =
-            { live = True, index = List.length items } :: items
+            Array.push { live = True, index = Array.length items, text = "Item " ++ String.fromInt (Array.length items + 1) } Array.empty |> Array.append items
 
         addListItem mul =
             case mul of
@@ -249,7 +285,7 @@ addItem key state =
                     { m | listItems = addTo m.listItems }
 
                 Nothing ->
-                    { emptyMul | listItems = addTo [] }
+                    { emptyMul | listItems = addTo Array.empty }
     in
     case key of
         NonPlayerKey _ ->
@@ -273,13 +309,13 @@ set key value state =
         setMul mulKey mul =
             case ( mulKey, mul ) of
                 ( KeyNotUnderList id, Nothing ) ->
-                    { listItems = [], underList = Dict.empty, notUnderList = Dict.singleton id value }
+                    { listItems = Array.empty, underList = Dict.empty, notUnderList = Dict.singleton id value }
 
                 ( KeyNotUnderList id, Just s ) ->
                     { s | notUnderList = Dict.insert id value s.notUnderList }
 
                 ( KeyUnderList idx id, Nothing ) ->
-                    { listItems = [], notUnderList = Dict.empty, underList = Dict.singleton idx (Dict.singleton id value) }
+                    { listItems = Array.empty, notUnderList = Dict.empty, underList = Dict.singleton idx (Dict.singleton id value) }
 
                 ( KeyUnderList idx id, Just s ) ->
                     { s | underList = Dict.update idx (setInner id >> Just) s.underList }
@@ -387,6 +423,7 @@ init url =
 type TrackMsg
     = ApplyEffects (Key ()) String (List Effect)
     | SetWholeNumber Field (Key String) String
+    | SetItemText (Key ()) String
     | UpdatePlayerAlias Int String
     | NewListItem (Key ()) Field
     | RemoveListItem (Key ())
@@ -513,6 +550,9 @@ update msg model =
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ _ "") ->
             model
+
+        TrackerMsg schema state turns aliases (SetItemText key text) ->
+            log schema (setItemText key text state) turns Nothing aliases
 
         TrackerMsg schema state turns aliases (NewListItem key field) ->
             log schema (addItem key state) turns Nothing aliases
@@ -678,7 +718,7 @@ view model =
         TrackerStage def state turns log aliases ->
             div []
                 [ viewTracker def state turns aliases
-                , viewLogs log aliases
+                , viewLogs log state aliases
                 , div [] [ makeUrl "track" model.schemaJson model.url ]
                 , div [] [ makeUrl "edit" model.schemaJson model.url ]
                 ]
@@ -715,13 +755,13 @@ view model =
                 ]
 
 
-viewLogs : List Log -> PlayerAliases -> Html Msg
-viewLogs entries aliases =
-    div [] (h1 [] [ text "History" ] :: List.map (viewLog aliases) entries)
+viewLogs : List Log -> TrackingState -> PlayerAliases -> Html Msg
+viewLogs entries state aliases =
+    div [] (h1 [] [ text "History" ] :: List.map (viewLog aliases state) entries)
 
 
-viewLog : PlayerAliases -> Log -> Html Msg
-viewLog aliases log =
+viewLog : PlayerAliases -> TrackingState -> Log -> Html Msg
+viewLog aliases state log =
     div []
         [ case log of
             GameStarted turns ->
@@ -741,13 +781,19 @@ viewLog aliases log =
                 text action
 
             ValueUpdated s ->
-                case s.key of
-                    NonPlayerKey _ ->
-                        text (s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
+                let
+                    itemSegment =
+                      case getItemText s.key state of
+                          Just t -> ", " ++ t
+                          Nothing -> ""
+                in
+                  case s.key of
+                      NonPlayerKey _ ->
+                          text (s.field.text ++ itemSegment ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
 
-                    PlayerKey player _ ->
-                        text (playerName player aliases ++ "'s " ++ s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
-        ]
+                      PlayerKey player _ ->
+                          text (playerName player aliases ++ itemSegment ++ "'s " ++ s.field.text ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
+          ]
 
 
 viewPlayerSelection : Int -> { minPlayers : Int, maxPlayers : Int } -> TrackerTopLevelSchema -> Html Msg
@@ -846,7 +892,7 @@ eval schema turns expr key state currentPlayer =
                 Op Sum [ Ref targetId AllPlayersLists ] ->
                     turns
                         |> playerIds
-                        |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault [] |> List.map (\v -> ( p, v )))
+                        |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault Array.empty |> Array.toList |> List.map (\v -> ( p, v )))
                         |> List.filter (\( _, item ) -> item.live)
                         |> List.map (\( p, i ) -> get (k |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                         |> firstError
@@ -861,7 +907,8 @@ eval schema turns expr key state currentPlayer =
                             state.player
                                 |> Dict.get p
                                 |> Maybe.map .listItems
-                                |> Maybe.withDefault []
+                                |> Maybe.withDefault Array.empty
+                                |> Array.toList
                                 |> List.filter (\i -> i.live)
                                 |> List.map (\i -> get (k |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                                 |> firstError
@@ -921,7 +968,9 @@ viewTrackerComponent schema tracker state turns key aliases =
             div []
                 [ text s.text
                 , text " "
-                , input [] []
+                , case getItemText key state of
+                    Just t -> input [ value t, onInput (SetItemText key) ] []
+                    Nothing -> input [] []
                 ]
 
         WholeNumberSchema s ->
@@ -968,7 +1017,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                 ]
                 [ div [] [ text s.text, button [ onClick (NewListItem key { id = s.id, text = s.text }) ] [ text "+" ] ]
                 , listItems (keyWithId s.id key) state
-                    |> List.map
+                    |> Array.map
                         (\item ->
                             ( String.fromInt item.index
                             , if item.live then
@@ -985,6 +1034,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                                 text ""
                             )
                         )
+                    |> Array.toList
                     |> Keyed.node "div" []
                 ]
 
