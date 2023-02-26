@@ -364,7 +364,7 @@ type alias PlayerAliases =
 type StageState
     = DefinitionStage DefinitionValidity
     | PlayerSelectionStage Int { minPlayers : Int, maxPlayers : Int } TrackerTopLevelSchema PlayerAliases
-    | BigError Error
+    | BigError Model Error
     | TrackerStage TrackerTopLevelSchema TrackingState Turns (List Log) PlayerAliases
 
 
@@ -396,6 +396,7 @@ type Msg
     = UpdateDefinition String
     | MoveToPlayerSelection TrackerTopLevelSchema
     | MoveToEdit
+    | MoveTo Model
     | TrackerMsg TrackerTopLevelSchema TrackingState Turns PlayerAliases TrackMsg
     | SetNumberOfPlayers TrackerTopLevelSchema String
     | ConfirmNumberOfPlayers TrackerTopLevelSchema
@@ -459,6 +460,9 @@ update msg model =
             TrackerStage schema state players compacted aliases |> toState
     in
     case msg of
+        MoveTo m ->
+            m
+
         Noop ->
             model
 
@@ -483,7 +487,7 @@ update msg model =
                     log def emptyState turns (Just <| GameStarted turns) Dict.empty
 
                 _ ->
-                    BigError TooManyPlayerGroupsDefined |> toState
+                    BigError model TooManyPlayerGroupsDefined |> toState
 
         UpdateDefinition def ->
             case Decode.decodeString trackerTopLevelSchemaDecoder def of
@@ -502,7 +506,7 @@ update msg model =
                     log sc st ts (Just <| ActionPerformed key action effects) aliases
 
                 Err e ->
-                    BigError e |> toState
+                    BigError model e |> toState
 
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
             log schema state turns Nothing (Dict.insert playerNumber newAlias aliases)
@@ -536,10 +540,10 @@ update msg model =
                                 log schema (set key num state) turns (Just <| event) aliases
 
                         Err e ->
-                            e |> UnexpectedError |> BigError |> toState
+                            e |> UnexpectedError |> BigError model |> toState
 
                 Nothing ->
-                    CouldNotParseWholeNumber rawValue |> BigError |> toState
+                    CouldNotParseWholeNumber rawValue |> BigError model |> toState
 
         ConfirmNumberOfPlayers schema ->
             case model.state of
@@ -551,7 +555,7 @@ update msg model =
                     log schema emptyState turns (Just <| GameStarted turns) aliases
 
                 _ ->
-                    BigError CouldNotReadNumberOfPlayers |> toState
+                    BigError model CouldNotReadNumberOfPlayers |> toState
 
         SetNumberOfPlayers _ "" ->
             model
@@ -562,7 +566,7 @@ update msg model =
                     PlayerSelectionStage players bounds schema aliases |> toState
 
                 _ ->
-                    BigError CouldNotReadNumberOfPlayers |> toState
+                    BigError model CouldNotReadNumberOfPlayers |> toState
 
 
 applyEffect : Key a -> Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
@@ -656,7 +660,7 @@ viewWithTile model =
             PlayerSelectionStage _ _ _ _ ->
                 "b-b-r | Select Players"
 
-            BigError _ ->
+            BigError _ _ ->
                 "b-b-r | Error"
 
             TrackerStage schema _ _ _ _ ->
@@ -682,7 +686,7 @@ view model =
         PlayerSelectionStage current players schema aliases ->
             viewPlayerSelection current players schema
 
-        BigError err ->
+        BigError prev err ->
             div []
                 [ h1 [] [ text "Error" ]
                 , case err of
@@ -707,6 +711,7 @@ view model =
                     UnexpectedError message ->
                         "Unexpected error: " ++ message |> text
                 , button [ onClick MoveToEdit ] [ text "Return to edit" ]
+                , button [ onClick (MoveTo prev) ] [ text "Return to last state" ]
                 ]
 
 
