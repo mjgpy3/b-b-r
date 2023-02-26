@@ -96,6 +96,18 @@ type Key v
     = NonPlayerKey (KeyMaybeUnderList v)
     | PlayerKey Int (KeyMaybeUnderList v)
 
+idFromKey : String -> Key String -> Html.Attribute a
+idFromKey context key =
+    let
+      idify = String.replace " " "-"
+      idFromMk mk =
+          case mk of
+            KeyUnderList i v -> "item-" ++ String.fromInt i ++ "-" ++ idify v ++ "-" ++ idify context
+            KeyNotUnderList v -> idify v ++ "-" ++ idify context
+    in
+      id <| case key of
+        NonPlayerKey mk -> idFromMk mk
+        PlayerKey p mk -> "player-" ++ String.fromInt p ++ "-" ++ idFromMk mk
 
 emptyKey : Key ()
 emptyKey =
@@ -819,7 +831,7 @@ viewEditTracker def url valid =
             ValidDefinition d ->
                 div [class "definition-valid"]
                     [ div [] [ text <| "Definition good: " ++ d.name ]
-                    , button [ onClick (MoveToPlayerSelection d) ] [ text "Create!" ]
+                    , button [ onClick (MoveToPlayerSelection d), class "create-tracker-button" ] [ text "Create!" ]
                     ]
 
             InvalidDefinition err ->
@@ -965,7 +977,7 @@ viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -
 viewTrackerComponent schema tracker state turns key aliases =
     case tracker of
         TextSchema s ->
-            div []
+            div [ key |> keyWithId s.text |> idFromKey "text" ]
                 [ text s.text
                 , text " "
                 , case getItemText key state of
@@ -985,30 +997,30 @@ viewTrackerComponent schema tracker state turns key aliases =
                     v =
                         valueToString <| Result.withDefault (lookupDefault s.default key) (get numberKey ( state, schema ))
                 in
-                div []
+                div [ class "number-field", numberKey |> idFromKey "number"  ]
                     [ text s.text
                     , text " "
                     , if s.disabled then
-                        text v
+                        span [class "number-value"] [ text v ]
 
                       else
                         input [ type_ "number", onInput (SetWholeNumber { id = s.id, text = s.text } numberKey), value v ] []
                     ]
 
         Calculated s ->
-            div []
+            div [ class "calculated-field", class "number-field", key |> keyWithId (Maybe.withDefault s.text s.id) |> idFromKey "calculated" ]
                 [ text s.text
                 , text " "
                 , case eval schema turns s.equals key state turns.currentPlayerTurn of
                     Ok (WholeNumber v) ->
-                        v |> String.fromInt |> text
+                        [v |> String.fromInt |> text] |> span [class "calculation-result"]
 
                     Ok (DecimalNumber v) ->
-                        v |> Round.round 2 |> text
+                        [v |> Round.round 2 |> text] |> span [class "calculation-result"]
 
                     Err e ->
-                        text ("Error: " ++ e)
-                , span [s.equals |> expressionToString |> title] [text " 🛈"]
+                        ["Error: " ++ e |> text] |> span [class "calculation-error"]
+                , span [class "calculation-hint", s.equals |> expressionToString |> title] [text " 🛈"]
                 ]
 
         ItemList s ->
@@ -1065,19 +1077,22 @@ viewTrackerComponent schema tracker state turns key aliases =
 
         PlayerGroup s ->
             let
+                common playerNumber =
+                    [style "margin-top" "10px", class ("player-" ++ String.fromInt playerNumber ++ " " ++ if turns.currentPlayerTurn == playerNumber then "current-player" else "player")]
+
                 currentPlayerIndicator playerNumber =
                     if turns.currentPlayerTurn == playerNumber && not turns.disabled then
-                        [ style "border" "2px dashed gray", style "background-color" "lightyellow", style "margin-top" "10px"]
+                        [ style "border" "2px dashed gray", style "background-color" "lightyellow"] ++ common playerNumber
 
                     else
-                        [style "margin-top" "10px"]
+                        common playerNumber
             in
             playerIds turns
                 |> List.map (\i -> div (currentPlayerIndicator i) [ viewPlayerIndicator turns i aliases, viewTrackerComponent schema (Group { items = s.items, collapsed = Nothing, text = Nothing }) state turns (keyWithPlayerNumber i key) aliases ])
                 |> div []
 
         Action s ->
-            button [ onClick (ApplyEffects key s.text s.effects) ] [ text s.text ]
+            button [ onClick (ApplyEffects key s.text s.effects), key |> keyWithId s.text |> idFromKey "action" ] [ text s.text ]
 
 
 playerName : Int -> PlayerAliases -> String

@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [24/38]
+* Items [25/38]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
 ** DONE Sum cross-player 
@@ -33,7 +33,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-21 Tue 22:43]
 ** DONE Better current player indicator 
    CLOSED: [2023-02-26 Sun 00:30]
-** TODO Regression tests
+** DONE Regression tests
+   CLOSED: [2023-02-26 Sun 18:49]
 ** DONE Base64 URLs
    CLOSED: [2023-02-21 Tue 21:20]
 ** DONE Kill team improvements [1/1]

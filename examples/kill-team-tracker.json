@@ -45,7 +45,7 @@
           {
             "type": "number",
             "text": "Command Points",
-            "default": 2,
+            "default": 4,
             "id": "command-points"
           },
           {
