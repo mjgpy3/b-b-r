@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [21/38]
+* Items [22/38]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
 ** DONE Sum cross-player 
@@ -13,7 +13,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-25 Sat 21:23]
 ** DONE Allow to disable turns
    CLOSED: [2023-02-25 Sat 21:34]
-** TODO Allow errors to return to tracking 
+** DONE Allow errors to return to tracking 
+   CLOSED: [2023-02-26 Sun 00:15]
 ** TODO List defaults 
 ** TODO Reflect items in log 
 ** DONE Top-level history
