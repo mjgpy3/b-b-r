@@ -810,31 +810,31 @@ eval schema turns expr key state currentPlayer =
                 ( DecimalNumber a, WholeNumber b ) ->
                     oFloat a (toFloat b) |> DecimalNumber
 
-        op oInt oFloat a b =
+        op k oInt oFloat a b =
             case b of
                 Err err ->
                     Err err
 
                 Ok v2 ->
-                    case aux a of
+                    case aux k a of
                         Ok v1 ->
                             append oInt oFloat v1 v2 |> Ok
 
                         Err err ->
                             Err err
 
-        aux e =
+        aux k e =
             case e of
                 Op Add ops ->
-                    List.foldl (op (\a b -> a + b) (\a b -> a + b)) (WholeNumber 0 |> Ok) ops
+                    List.foldl (op k (\a b -> a + b) (\a b -> a + b)) (WholeNumber 0 |> Ok) ops
 
                 Op Mul ops ->
-                    List.foldl (op (\a b -> a * b) (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
+                    List.foldl (op  k(\a b -> a * b) (\a b -> a * b)) (WholeNumber 1 |> Ok) ops
 
                 Op Sum [ Ref targetId AllPlayers ] ->
                     turns
                         |> playerIds
-                        |> List.map (SpecificPlayer >> Ref targetId >> aux)
+                        |> List.map (\p -> SpecificPlayer p |> Ref targetId |> aux (keyWithPlayerNumber p k))
                         |> firstError
                         |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
@@ -843,12 +843,12 @@ eval schema turns expr key state currentPlayer =
                         |> playerIds
                         |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault [] |> List.map (\v -> ( p, v )))
                         |> List.filter (\( _, item ) -> item.live)
-                        |> List.map (\( p, i ) -> get (key |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
+                        |> List.map (\( p, i ) -> get (k |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                         |> firstError
                         |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
                 Op Sum [ Ref targetId ThisPlayer ] ->
-                    case key of
+                    case k of
                         NonPlayerKey _ ->
                             "Found reference to this-player's " ++ targetId ++ "outside of player context!" |> Err
 
@@ -858,7 +858,7 @@ eval schema turns expr key state currentPlayer =
                                 |> Maybe.map .listItems
                                 |> Maybe.withDefault []
                                 |> List.filter (\i -> i.live)
-                                |> List.map (\i -> get (key |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
+                                |> List.map (\i -> get (k |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                                 |> firstError
                                 |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
@@ -871,7 +871,7 @@ eval schema turns expr key state currentPlayer =
                 Ref targetId scope ->
                     let
                         refKey =
-                            case ( scope, key ) of
+                            case ( scope, k ) of
                                 ( NonPlayer, _ ) ->
                                     targetId |> KeyNotUnderList |> NonPlayerKey |> Ok
 
@@ -891,14 +891,14 @@ eval schema turns expr key state currentPlayer =
                                     targetId |> KeyNotUnderList |> PlayerKey this |> Ok
 
                                 ( ThisPlayer, NonPlayerKey _ ) ->
-                                    Err "Referenced this player, but couldn't find them"
+                                    "Referenced this player when finding " ++ targetId ++ " but couldn't find them" |> Err
                     in
                     case fieldsById targetId schema.tracker of
                         [ Calculated s ] ->
-                            aux s.equals
+                            aux k s.equals
 
                         [ _ ] ->
-                            refKey |> Result.andThen (\k -> get k ( state, schema ))
+                            refKey |> Result.andThen (\rk -> get rk ( state, schema ))
 
                         [] ->
                             "Tried to reference of field that does not exist, ID: " ++ targetId |> Err
@@ -906,7 +906,7 @@ eval schema turns expr key state currentPlayer =
                         _ ->
                             "IDs cannot be shared across multiple components, ID: " ++ targetId |> Err
     in
-    aux expr
+    aux key expr
 
 
 viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -> Turns -> Key () -> PlayerAliases -> Html TrackMsg

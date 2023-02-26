@@ -115,6 +115,7 @@
           {
             "type": "calculated",
             "text": "Cash Total",
+            "id": "cash-total",
             "equals": {
               "type": "add",
               "ops": [
@@ -255,6 +256,7 @@
           {
             "type": "calculated",
             "text": "Check Total",
+            "id": "check-total",
             "equals": {
               "type": "sum",
               "of": {
@@ -263,12 +265,32 @@
                 "scope": "this-player"
               }
             }
+          },
+          {
+            "type": "calculated",
+            "text": "Bucket Total",
+            "equals": {
+              "type": "add",
+              "ops": [
+                {
+                  "type": "ref",
+                  "targetId": "check-total",
+                  "scope": "this-player"
+                },
+                {
+                  "type": "ref",
+                  "targetId": "cash-total",
+                  "scope": "this-player"
+                }
+              ]
+            }
           }
         ]
       },
       {
         "type": "calculated",
         "text": "All Checks Total",
+        "id": "all-checks",
         "equals": {
           "type": "sum",
           "of": {
@@ -276,6 +298,36 @@
             "targetId": "check-amount",
             "scope": "all-players-lists"
           }
+        }
+      },
+      {
+        "type": "calculated",
+        "text": "All Cash Total",
+        "id": "all-cash",
+        "equals": {
+          "type": "sum",
+          "of": {
+            "type": "ref",
+            "targetId": "cash-total",
+            "scope": "all-players"
+          }
+        }
+      },
+      {
+        "type": "calculated",
+        "text": "Grand Total",
+        "equals": {
+          "type": "add",
+          "ops": [
+            {
+              "type": "ref",
+              "targetId": "all-checks"
+            },
+            {
+              "type": "ref",
+              "targetId": "all-cash"
+            }
+          ]
         }
       }
     ]
