@@ -1,5 +1,6 @@
 {
   "name": "Money",
+  "turns": false,
   "tracker": {
     "type": "group",
     "items": [
@@ -267,7 +268,7 @@
       },
       {
         "type": "calculated",
-        "text": "Check Total",
+        "text": "All Checks Total",
         "equals": {
           "type": "sum",
           "of": {

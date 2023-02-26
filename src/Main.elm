@@ -334,6 +334,7 @@ playerIds turns =
 type alias Turns =
     { currentPlayerTurn : Int
     , playerCount : Int
+    , disabled : Bool
     }
 
 
@@ -467,7 +468,7 @@ update msg model =
                     if players.minPlayers == players.maxPlayers then
                         let
                             turns =
-                                { currentPlayerTurn = 0, playerCount = players.maxPlayers }
+                                { currentPlayerTurn = 0, playerCount = players.maxPlayers, disabled = not def.turns }
                         in
                         log def emptyState turns (Just <| GameStarted turns) aliases
 
@@ -477,7 +478,7 @@ update msg model =
                 [] ->
                     let
                         turns =
-                            { currentPlayerTurn = 0, playerCount = 1 }
+                            { currentPlayerTurn = 0, playerCount = 1, disabled = not def.turns }
                     in
                     log def emptyState turns (Just <| GameStarted turns) Dict.empty
 
@@ -545,7 +546,7 @@ update msg model =
                 PlayerSelectionStage players bounds _ aliases ->
                     let
                         turns =
-                            { currentPlayerTurn = 0, playerCount = players }
+                            { currentPlayerTurn = 0, playerCount = players, disabled = not schema.turns }
                     in
                     log schema emptyState turns (Just <| GameStarted turns) aliases
 
@@ -560,7 +561,6 @@ update msg model =
                 ( Just players, PlayerSelectionStage _ bounds _ aliases ) ->
                     PlayerSelectionStage players bounds schema aliases |> toState
 
-                --                    TrackerStage schema Dict.empty { currentPlayerTurn = 0, playerCount = players } |> toState
                 _ ->
                     BigError CouldNotReadNumberOfPlayers |> toState
 
@@ -720,11 +720,14 @@ viewLog aliases log =
     div []
         [ case log of
             GameStarted turns ->
-                if turns.playerCount > 1 then
+                if turns.playerCount > 1 && not turns.disabled then
                     text (String.fromInt turns.playerCount ++ " player game started, " ++ playerName turns.currentPlayerTurn aliases ++ "'s turn")
 
-                else
+                else if not turns.disabled then
                     text "Game started"
+
+                else
+                    text ""
 
             ActionPerformed (PlayerKey player _) action _ ->
                 text (playerName player aliases ++ " " ++ action)
@@ -838,9 +841,9 @@ eval schema turns expr key state currentPlayer =
                 Op Sum [ Ref targetId AllPlayersLists ] ->
                     turns
                         |> playerIds
-                        |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault [] |> List.map (\v -> (p, v)))
-                        |> List.filter (\(_, item) -> item.live)
-                        |> List.map (\(p, i) -> get (key |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
+                        |> List.concatMap (\p -> Dict.get p state.player |> Maybe.map .listItems |> Maybe.withDefault [] |> List.map (\v -> ( p, v )))
+                        |> List.filter (\( _, item ) -> item.live)
+                        |> List.map (\( p, i ) -> get (key |> keyWithPlayerNumber p |> keyWithItemNumber i.index |> keyWithId targetId) ( state, schema ))
                         |> firstError
                         |> Result.map (List.foldl (append (+) (+)) (WholeNumber 0))
 
@@ -890,11 +893,18 @@ eval schema turns expr key state currentPlayer =
                                 ( ThisPlayer, NonPlayerKey _ ) ->
                                     Err "Referenced this player, but couldn't find them"
                     in
-                        case fieldsById targetId schema.tracker of
-                            [Calculated s] -> aux s.equals
-                            [_] -> refKey |> Result.andThen (\k -> get k ( state, schema ))
-                            [] -> "Tried to reference of field that does not exist, ID: " ++ targetId |> Err
-                            _ -> "IDs cannot be shared across multiple components, ID: " ++ targetId |> Err
+                    case fieldsById targetId schema.tracker of
+                        [ Calculated s ] ->
+                            aux s.equals
+
+                        [ _ ] ->
+                            refKey |> Result.andThen (\k -> get k ( state, schema ))
+
+                        [] ->
+                            "Tried to reference of field that does not exist, ID: " ++ targetId |> Err
+
+                        _ ->
+                            "IDs cannot be shared across multiple components, ID: " ++ targetId |> Err
     in
     aux expr
 
@@ -1013,7 +1023,7 @@ viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
 viewPlayerIndicator turns playerNumber aliases =
     let
         currentPlayerIndicator =
-            if turns.currentPlayerTurn == playerNumber then
+            if turns.currentPlayerTurn == playerNumber && not turns.disabled then
                 style "border" "4px solid black"
 
             else
@@ -1373,7 +1383,7 @@ idDefault id schema =
             Nothing
 
 
-fieldsById : String -> TrackerSchema -> (List TrackerSchema)
+fieldsById : String -> TrackerSchema -> List TrackerSchema
 fieldsById id schema =
     case schema of
         TextSchema s ->
@@ -1381,7 +1391,7 @@ fieldsById id schema =
 
         WholeNumberSchema s ->
             if s.id == id then
-                [WholeNumberSchema s]
+                [ WholeNumberSchema s ]
 
             else
                 []
@@ -1390,9 +1400,11 @@ fieldsById id schema =
             List.concatMap (fieldsById id) s.items
 
         ItemList s ->
-            if s.id == id
-            then ItemList s::List.concatMap (fieldsById id) s.items
-            else List.concatMap (fieldsById id) s.items
+            if s.id == id then
+                ItemList s :: List.concatMap (fieldsById id) s.items
+
+            else
+                List.concatMap (fieldsById id) s.items
 
         PlayerGroup s ->
             List.concatMap (fieldsById id) s.items
@@ -1402,17 +1414,22 @@ fieldsById id schema =
 
         Calculated s ->
             if s.id == Just id then
-                [Calculated s]
+                [ Calculated s ]
 
             else
                 []
 
+
 trackerTopLevelSchemaDecoder : Decoder TrackerTopLevelSchema
 trackerTopLevelSchemaDecoder =
-    Decode.map2 TrackerTopLevelSchema (field "name" string) (field "tracker" trackerSchemaDecoder)
+    Decode.map3 TrackerTopLevelSchema
+        (field "name" string)
+        (field "tracker" trackerSchemaDecoder)
+        (Decode.map (Maybe.withDefault True) (Decode.maybe (field "turns" Decode.bool)))
 
 
 type alias TrackerTopLevelSchema =
     { name : String
     , tracker : TrackerSchema
+    , turns : Bool
     }
