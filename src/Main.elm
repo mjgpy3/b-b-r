@@ -890,7 +890,11 @@ eval schema turns expr key state currentPlayer =
                                 ( ThisPlayer, NonPlayerKey _ ) ->
                                     Err "Referenced this player, but couldn't find them"
                     in
-                    refKey |> Result.andThen (\k -> get k ( state, schema ))
+                        case fieldsById targetId schema.tracker of
+                            [Calculated s] -> aux s.equals
+                            [_] -> refKey |> Result.andThen (\k -> get k ( state, schema ))
+                            [] -> "Tried to reference of field that does not exist, ID: " ++ targetId |> Err
+                            _ -> "IDs cannot be shared across multiple components, ID: " ++ targetId |> Err
     in
     aux expr
 
@@ -1224,10 +1228,11 @@ textDecoder =
 
 calculatedDecoder : Decoder TrackerSchema
 calculatedDecoder =
-    Decode.map2
-        (\text equals -> Calculated { text = text, equals = equals })
+    Decode.map3
+        (\text equals id -> Calculated { text = text, equals = equals, id = id })
         (field "text" string)
         (field "equals" expressionDecoder)
+        (Decode.maybe (field "id" Decode.string))
 
 
 itemListDecoder : Decoder TrackerSchema
@@ -1304,7 +1309,7 @@ type TrackerSchema
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool }
     | TextSchema { text : String, id : String }
-    | Calculated { text : String, equals : Expression }
+    | Calculated { text : String, equals : Expression, id : Maybe String }
     | ItemList { text : String, id : String, items : List TrackerSchema }
 
 
@@ -1367,6 +1372,40 @@ idDefault id schema =
         Calculated _ ->
             Nothing
 
+
+fieldsById : String -> TrackerSchema -> (List TrackerSchema)
+fieldsById id schema =
+    case schema of
+        TextSchema s ->
+            []
+
+        WholeNumberSchema s ->
+            if s.id == id then
+                [WholeNumberSchema s]
+
+            else
+                []
+
+        Group s ->
+            List.concatMap (fieldsById id) s.items
+
+        ItemList s ->
+            if s.id == id
+            then ItemList s::List.concatMap (fieldsById id) s.items
+            else List.concatMap (fieldsById id) s.items
+
+        PlayerGroup s ->
+            List.concatMap (fieldsById id) s.items
+
+        Action s ->
+            []
+
+        Calculated s ->
+            if s.id == Just id then
+                [Calculated s]
+
+            else
+                []
 
 trackerTopLevelSchemaDecoder : Decoder TrackerTopLevelSchema
 trackerTopLevelSchemaDecoder =

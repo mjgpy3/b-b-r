@@ -1,0 +1,55 @@
+{
+  "name": "Calculated referencing calculated",
+  "tracker": {
+    "type": "group",
+    "items": [
+      {
+        "type": "number",
+        "text": "A",
+        "default": 2,
+        "id": "a"
+      },
+      {
+        "type": "number",
+        "text": "B",
+        "default": 21,
+        "id": "b"
+      },
+      {
+        "type": "calculated",
+        "text": "A*B",
+        "id": "first",
+        "equals": {
+          "type": "mul",
+          "ops": [
+            {
+              "type": "ref",
+              "targetId": "a"
+            },
+            {
+              "type": "ref",
+              "targetId": "b"
+            }
+          ]
+        }
+      },
+      {
+        "type": "calculated",
+        "text": "A*B*3",
+        "equals": {
+          "type": "mul",
+          "ops": [
+            {
+              "type": "ref",
+              "targetId": "first"
+            },
+            {
+              "type": "literal",
+              "value": 3
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
