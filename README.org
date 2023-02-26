@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [22/38]
+* Items [23/38]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
 ** DONE Sum cross-player 
@@ -30,7 +30,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-21 Tue 21:59]
 ** DONE Player aliases 
    CLOSED: [2023-02-21 Tue 22:43]
-** TODO Better current player indicator 
+** DONE Better current player indicator 
+   CLOSED: [2023-02-26 Sun 00:30]
 ** TODO Regression tests
 ** DONE Base64 URLs
    CLOSED: [2023-02-21 Tue 21:20]

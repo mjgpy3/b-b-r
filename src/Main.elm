@@ -5,7 +5,7 @@ import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea, span)
+import Html exposing (Html, a, b, button, details, div, h1, hr, i, input, pre, summary, text, textarea, span)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed as Keyed
@@ -1003,7 +1003,7 @@ viewTrackerComponent schema tracker state turns key aliases =
 
                 group content =
                     div
-                        [ style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem" ]
+                        [ style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem", style "margin-bottom" "1rem" , style "margin-top" "1rem" ]
                         [ if collapses then
                             details [] (summary [] [ header ] :: content)
 
@@ -1014,7 +1014,17 @@ viewTrackerComponent schema tracker state turns key aliases =
             s.items |> List.map (\i -> viewTrackerComponent schema i state turns key aliases) |> group
 
         PlayerGroup s ->
-            playerIds turns |> List.map (\i -> div [] [ h2 [] [ viewPlayerIndicator turns i aliases ], viewTrackerComponent schema (Group { items = s.items, collapsed = Nothing, text = Nothing }) state turns (keyWithPlayerNumber i key) aliases ]) |> div []
+            let
+                currentPlayerIndicator playerNumber =
+                    if turns.currentPlayerTurn == playerNumber && not turns.disabled then
+                        [ style "border" "2px dashed gray", style "background-color" "lightyellow", style "margin-top" "10px"]
+
+                    else
+                        [style "margin-top" "10px"]
+            in
+            playerIds turns
+                |> List.map (\i -> div (currentPlayerIndicator i) [ viewPlayerIndicator turns i aliases, viewTrackerComponent schema (Group { items = s.items, collapsed = Nothing, text = Nothing }) state turns (keyWithPlayerNumber i key) aliases ])
+                |> div []
 
         Action s ->
             button [ onClick (ApplyEffects key s.text s.effects) ] [ text s.text ]
@@ -1027,15 +1037,7 @@ playerName playerNumber aliases =
 
 viewPlayerIndicator : Turns -> Int -> PlayerAliases -> Html TrackMsg
 viewPlayerIndicator turns playerNumber aliases =
-    let
-        currentPlayerIndicator =
-            if turns.currentPlayerTurn == playerNumber && not turns.disabled then
-                style "border" "4px solid black"
-
-            else
-                style "border-left" "0px"
-    in
-    div [ currentPlayerIndicator ]
+    div []
         [ input [ value (playerName playerNumber aliases), onInput (UpdatePlayerAlias playerNumber) ] []
         ]
 
