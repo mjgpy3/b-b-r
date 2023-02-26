@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [20/38]
+* Items [21/38]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
 ** DONE Sum cross-player 
@@ -23,7 +23,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Then way to replay history (e.g. resume game) 
 ** TODO Then way to persist state locally (don't lose on refresh)
 ** TODO Then way to download history 
-** TODO Show calculated field breakdown 
+** DONE Show calculated field breakdown 
+   CLOSED: [2023-02-26 Sun 00:06]
 ** DONE Publish 
    CLOSED: [2023-02-21 Tue 21:59]
 ** DONE Player aliases 
