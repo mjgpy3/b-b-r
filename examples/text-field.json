@@ -1,8 +1,0 @@
-{
-  "name": "Text Field",
-  "tracker": {
-      "type": "text",
-      "text": "Enter something",
-      "id": "something"
-  }
-}

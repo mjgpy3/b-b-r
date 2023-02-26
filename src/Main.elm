@@ -817,13 +817,13 @@ viewEditTracker def url valid =
         , div [] [ textarea [ cols 40, rows 10, placeholder "...", onInput UpdateDefinition, value def ] [] ]
         , case valid of
             ValidDefinition d ->
-                div []
+                div [class "definition-valid"]
                     [ div [] [ text <| "Definition good: " ++ d.name ]
                     , button [ onClick (MoveToPlayerSelection d) ] [ text "Create!" ]
                     ]
 
             InvalidDefinition err ->
-                div []
+                div [class "definition-invalid"]
                     [ text "Definition invalid"
                     , pre [] [ text <| Decode.errorToString err ]
                     ]
