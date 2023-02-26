@@ -5,7 +5,7 @@ import Base64.Encode as Base64E
 import Browser
 import Debug as Debug
 import Dict exposing (Dict)
-import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea)
+import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea, span)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed as Keyed
@@ -954,6 +954,7 @@ viewTrackerComponent schema tracker state turns key aliases =
 
                     Err e ->
                         text ("Error: " ++ e)
+                , span [s.equals |> expressionToString |> title] [text " 🛈"]
                 ]
 
         ItemList s ->
@@ -1120,6 +1121,15 @@ type CellScope
     | ThisPlayer
     | SpecificPlayer Int
 
+scopeToString : CellScope -> String
+scopeToString scope =
+    case scope of
+      NonPlayer -> ""
+      CurrentPlayer -> "[active]"
+      AllPlayers -> "[all]"
+      AllPlayersLists -> "all-items"
+      ThisPlayer -> "[this]"
+      SpecificPlayer idx -> "[" ++ String.fromInt idx ++ "]"
 
 type NewCurrentPlayer
     = CurrentIsThisPlayer
@@ -1292,12 +1302,25 @@ type Operator
     | Mul
     | Sum
 
+operatorToString : Operator -> String
+operatorToString op =
+    case op of
+        Add -> "+"
+        Mul -> "*"
+        Sum -> "+"
 
 type Expression
     = Op Operator (List Expression)
     | Ref String CellScope
     | Literal Value
 
+expressionToString : Expression -> String
+expressionToString expr =
+    case expr of
+      Op Sum [e] -> "sum(" ++ expressionToString e ++ ")"
+      Op op exprs -> exprs |> List.map expressionToString |> String.join (" " ++ operatorToString op ++ " ") |> \v -> "(" ++ v ++ ")"
+      Ref id scope -> id ++ scopeToString scope
+      Literal v -> valueToString v
 
 lookupDefault : Defaults -> Key a -> Value
 lookupDefault defaults key =
