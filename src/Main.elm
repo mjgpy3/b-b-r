@@ -807,7 +807,7 @@ viewPlayerSelection players { minPlayers, maxPlayers } schema =
 
 makeUrl : String -> String -> Url -> Html Msg
 makeUrl qp def url =
-    a [ { url | query = qp ++ "=" ++ Url.percentEncode (Base64E.encode (Base64E.string def)) |> Just } |> Url.toString |> href, target "_blank" ] [ "URL to " ++ qp |> text ]
+    a [ { url | query = qp ++ "=" ++ Url.percentEncode (Base64E.encode (Base64E.string def)) |> Just } |> Url.toString |> href, target "_blank", class (qp ++ "-link") ] [ "URL to " ++ qp |> text ]
 
 
 viewEditTracker : String -> Url -> DefinitionValidity -> Html Msg

@@ -1,5 +1,3 @@
-const fs = require("fs");
-
 const assertValid = () => {
   cy.get('.definition-valid').should('exist')
   cy.get('.definition-invalid').should('not.exist')
@@ -195,7 +193,7 @@ describe('parsing tracker schemas', () => {
       'simple-dominion-tracker.json',
     ].forEach(example =>
       it(`parses the example ${example}`, () => {
-        cy.get('textarea').type(JSON.stringify(require(`../../../../examples/${example}`)), { parseSpecialCharSequences: false, delay: 0 })
+        cy.get('textarea').type(JSON.stringify(require(`../../../../examples/${example}`)), { parseSpecialCharSequences: false, delay: 0 });
         assertValid();
       })
     )
