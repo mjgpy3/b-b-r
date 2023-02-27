@@ -340,6 +340,32 @@ findPlayerGroup schema =
         Calculated _ ->
             []
 
+numericFieldIds : TrackerSchema -> List (String, TrackerSchema)
+numericFieldIds schema =
+    case schema of
+        TextSchema s ->
+            []
+
+        WholeNumberSchema s ->
+            [(s.id, WholeNumberSchema s)]
+
+        Group s ->
+            List.concatMap numericFieldIds s.items
+
+        ItemList s ->
+            List.concatMap numericFieldIds s.items
+
+        PlayerGroup s ->
+            List.concatMap numericFieldIds s.items
+
+        Action s ->
+            []
+
+        Calculated s ->
+            case s.id of
+              Just id -> [(id, Calculated s)]
+              Nothing -> []
+
 
 idDefault : String -> TrackerSchema -> Maybe Defaults
 idDefault id schema =

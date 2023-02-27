@@ -66,28 +66,14 @@ initApp _ url =
         _ ->
             ( init url, Cmd.none )
 
-
--- No player group in an item list
--- Only one player group
--- No duplicate IDs
--- ID scope references make sense
--- No cyclical references
--- max/min coherency
--- Player group aliases are longer than max
--- Per-player defaults reference in range
--- Turns disabled but player-affecting components exist
-
 type DefinitionValidity
     = CanDecode TrackerTopLevelSchema
     | CannotDecode Decode.Error
     | StartingOut
 
-
-
 type KeyMaybeUnderList v
     = KeyUnderList Int v
     | KeyNotUnderList v
-
 
 type Key v
     = NonPlayerKey (KeyMaybeUnderList v)
