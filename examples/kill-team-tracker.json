@@ -46,18 +46,24 @@
             "type": "number",
             "text": "Command Points",
             "default": 4,
+            "min": 0,
+            "max": 99,
             "id": "command-points"
           },
           {
             "type": "number",
             "text": "Primary VP",
             "default": 0,
+            "min": 0,
+            "max": 99,
             "id": "primary-vp"
           },
           {
             "type": "number",
             "text": "Secondary VP",
             "default": 0,
+            "min": 0,
+            "max": 99,
             "id": "secondary-vp"
           },
           {
@@ -99,6 +105,7 @@
                     "type": "number",
                     "text": "Wounds",
                     "default": 0,
+                    "min": 0,
                     "id": "operative-wounds"
                   }
                 ]

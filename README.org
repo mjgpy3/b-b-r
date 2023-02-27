@@ -4,19 +4,19 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [25/38]
+* Items [26/38]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
-** DONE Sum cross-player 
+** DONE Sum cross-player
    CLOSED: [2023-02-25 Sat 14:49]
-** DONE Calculated fields referencing calculated fields 
+** DONE Calculated fields referencing calculated fields
    CLOSED: [2023-02-25 Sat 21:23]
 ** DONE Allow to disable turns
    CLOSED: [2023-02-25 Sat 21:34]
-** DONE Allow errors to return to tracking 
+** DONE Allow errors to return to tracking
    CLOSED: [2023-02-26 Sun 00:15]
 ** TODO List defaults 
-** DONE Reflect items in log 
+** DONE Reflect items in log
    CLOSED: [2023-02-26 Sun 01:27]
 ** DONE Top-level history
    CLOSED: [2023-02-20 Mon 23:27]
@@ -25,13 +25,13 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** TODO Then way to replay history (e.g. resume game) 
 ** TODO Then way to persist state locally (don't lose on refresh)
 ** TODO Then way to download history 
-** DONE Show calculated field breakdown 
+** DONE Show calculated field breakdown
    CLOSED: [2023-02-26 Sun 00:06]
-** DONE Publish 
+** DONE Publish
    CLOSED: [2023-02-21 Tue 21:59]
-** DONE Player aliases 
+** DONE Player aliases
    CLOSED: [2023-02-21 Tue 22:43]
-** DONE Better current player indicator 
+** DONE Better current player indicator
    CLOSED: [2023-02-26 Sun 00:30]
 ** DONE Regression tests
    CLOSED: [2023-02-26 Sun 18:49]
@@ -51,7 +51,8 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
    CLOSED: [2023-02-24 Fri 23:32]
 ** DONE Logs should use fields ids 
    CLOSED: [2023-02-25 Sat 00:34]
-** TODO Allow numeric fields to have a mix/min value
+** DONE Allow numeric fields to have a max/min value
+   CLOSED: [2023-02-26 Sun 22:18]
 ** DONE Hidden fields 
    CLOSED: [2023-02-23 Thu 23:46]
 ** DONE Allow for per-player field defaults

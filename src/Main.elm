@@ -1004,7 +1004,19 @@ viewTrackerComponent schema tracker state turns key aliases =
                         span [class "number-value"] [ text v ]
 
                       else
-                        input [ type_ "number", onInput (SetWholeNumber { id = s.id, text = s.text } numberKey), value v ] []
+                        let
+                          limitAttr bound attr = bound |> Maybe.map (valueToString >> attr >> List.singleton) |> Maybe.withDefault []
+                        in
+                          input
+                            (
+                              [ type_ "number"
+                              , onInput (SetWholeNumber { id = s.id, text = s.text } numberKey)
+                              , value v
+                              ]
+                              ++ limitAttr s.min Html.Attributes.min
+                              ++ limitAttr s.max Html.Attributes.max
+                            )
+                            []
                     ]
 
         Calculated s ->
@@ -1300,14 +1312,16 @@ wholeNumberDecoder =
                     (Decode.list (Decode.map2 (\a b -> ( a, b )) (field "player" Decode.int) (field "default" numberDecoder)))
                 )
     in
-    Decode.map6
-        (\text default id disabled hidden playerDefaults -> WholeNumberSchema { text = text, default = { playerDefaults = playerDefaults, default = default }, id = id, disabled = disabled == Just True, hidden = hidden == Just True })
+    Decode.map8
+        (\text default id disabled hidden playerDefaults min max -> WholeNumberSchema { text = text, default = { playerDefaults = playerDefaults, default = default }, id = id, disabled = disabled == Just True, hidden = hidden == Just True, min=min, max=max })
         (field "text" string)
         (field "default" numberDecoder)
         (field "id" string)
         (Decode.maybe (field "disabled" Decode.bool))
         (Decode.maybe (field "hidden" Decode.bool))
         (Decode.map (Maybe.withDefault Dict.empty) <| Decode.maybe playerDefaultsDecoder)
+        (Decode.maybe (field "min" numberDecoder))
+        (Decode.maybe (field "max" numberDecoder))
 
 
 textDecoder : Decoder TrackerSchema
@@ -1412,7 +1426,7 @@ type TrackerSchema
     = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
     | Group { items : List TrackerSchema, collapsed : Maybe Bool, text : Maybe String }
     | Action { text : String, effects : List Effect }
-    | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool }
+    | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool, min : Maybe Value, max : Maybe Value }
     | TextSchema { text : String, id : String }
     | Calculated { text : String, equals : Expression, id : Maybe String }
     | ItemList { text : String, id : String, items : List TrackerSchema }
