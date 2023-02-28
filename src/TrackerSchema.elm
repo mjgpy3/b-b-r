@@ -286,6 +286,12 @@ type Value
     = WholeNumber Int
     | DecimalNumber Float
 
+valueToFloat : Value -> Float
+valueToFloat v =
+    case v of
+      WholeNumber n -> toFloat n
+      DecimalNumber f -> f
+
 valueToString : Value -> String
 valueToString v =
     case v of
@@ -295,12 +301,19 @@ valueToString v =
         DecimalNumber n ->
             String.fromFloat n
 
+leq : Value -> Value -> Bool
+leq x y =
+  case (x, y) of
+      (WholeNumber a, WholeNumber b) -> a <= b
+      (a, b) -> valueToFloat a <= valueToFloat b
+
 type alias Defaults =
     { playerDefaults : Dict Int Value, default : Value }
 
+type alias PlayerGroupData = { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
 
 type TrackerSchema
-    = PlayerGroup { items : List TrackerSchema, minPlayers : Int, maxPlayers : Int, defaultAliases : List String }
+    = PlayerGroup PlayerGroupData
     | Group { items : List TrackerSchema, collapsed : Maybe Bool, text : Maybe String }
     | Action { text : String, effects : List Effect }
     | WholeNumberSchema { text : String, default : Defaults, id : String, disabled : Bool, hidden : Bool, min : Maybe Value, max : Maybe Value }
@@ -316,7 +329,7 @@ newPlayerAliases vs =
     List.indexedMap Tuple.pair vs |> Dict.fromList
 
 
-findPlayerGroup : TrackerSchema -> List ( { minPlayers : Int, maxPlayers : Int }, PlayerAliases )
+findPlayerGroup : TrackerSchema -> List ( PlayerGroupData, PlayerAliases )
 findPlayerGroup schema =
     case schema of
         WholeNumberSchema s ->
@@ -332,7 +345,7 @@ findPlayerGroup schema =
             List.concatMap findPlayerGroup s.items
 
         PlayerGroup s ->
-            ( { minPlayers = s.minPlayers, maxPlayers = s.maxPlayers }, newPlayerAliases s.defaultAliases ) :: List.concatMap findPlayerGroup s.items
+            ( s, newPlayerAliases s.defaultAliases ) :: List.concatMap findPlayerGroup s.items
 
         Action _ ->
             []

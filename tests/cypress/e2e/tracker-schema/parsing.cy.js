@@ -83,14 +83,20 @@ describe('parsing tracker schemas', () => {
 
     describe('action', () => {
       it("parses for a big example", () => {
-        const example = shell({
-          type: "action",
-          text: "A",
-          effects: [
-            {type:  "next-turn" },
-            {type: "set-current-player", target: "this-player" },
-            {type: "restore-default", targetId: "some-field", scope: 'this-player' },
-            {type: "adjust", targetId: "another-field", amount: -1, scope: 'all-players' },
+          const example = shell({
+            type: 'player-group',
+            minPlayers: 2,
+            maxPlayers: 4,
+            items: [ {
+              type: "action",
+              text: "A",
+              effects: [
+                {type:  "next-turn" },
+                {type: "set-current-player", target: "this-player" },
+                {type: "restore-default", targetId: "some-field", scope: 'this-player' },
+                {type: "adjust", targetId: "another-field", amount: -1, scope: 'all-players' },
+              ]
+            }
           ]
         });
         cy.get('textarea').type(JSON.stringify(example), { parseSpecialCharSequences: false, delay: 0 });
@@ -161,19 +167,28 @@ describe('parsing tracker schemas', () => {
 
     describe('calculated', () => {
       it("parses a large example", () => {
-        const example = shell({
-          type: "calculated",
-          text: ':)',
-          id: 'some-id',
-            equals: {
-                "type": "add",
-                "ops": [
+        const example = shell(
+          {
+            type: "player-group",
+            minPlayers: 2,
+            maxPlayers: 2,
+            items: [
+              {
+                type: "calculated",
+                text: ':)',
+                id: 'some-id',
+                equals: {
+                  "type": "add",
+                  "ops": [
                     { "type": "ref", "targetId": "target", "scope": "all-players" },
                     {type: "mul", ops: [ {"type": "literal", "value": 42.99}, {"type": "literal", "value": 42.99} ] },
                     {"type": "sum", "of": { "type": "ref", "targetId": "target" }}
-                ]
-            }
-        });
+                  ]
+                }
+              } 
+            ]
+          }
+          );
         cy.get('textarea').type(JSON.stringify(example), { parseSpecialCharSequences: false, delay: 0 });
         assertValid();
       });

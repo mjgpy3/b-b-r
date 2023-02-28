@@ -1,11 +1,12 @@
 module Main exposing (..)
 
+import Validation as Validation
 import Base64.Decode as Base64D
 import Base64.Encode as Base64E
 import Browser
 import Array exposing (Array)
 import Dict exposing (Dict)
-import Html exposing (Html, a, b, button, details, div, h1, hr, i, input, pre, summary, text, textarea, span)
+import Html exposing (Html, a, b, button, details, div, h1, h2, hr, i, input, pre, summary, text, textarea, span, ul, li)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed as Keyed
@@ -67,7 +68,8 @@ initApp _ url =
             ( init url, Cmd.none )
 
 type DefinitionValidity
-    = CanDecode TrackerTopLevelSchema
+    = CanDecodeWithoutErrors TrackerTopLevelSchema
+    | CanDecodeWithErrors (List Validation.BadSchemaError)
     | CannotDecode Decode.Error
     | StartingOut
 
@@ -394,7 +396,7 @@ type alias PlayerAliases =
 
 type StageState
     = DefinitionStage DefinitionValidity
-    | PlayerSelectionStage Int { minPlayers : Int, maxPlayers : Int } TrackerTopLevelSchema PlayerAliases
+    | PlayerSelectionStage Int PlayerGroupData TrackerTopLevelSchema PlayerAliases
     | BigError Model Error
     | TrackerStage TrackerTopLevelSchema TrackingState Turns (List Log) PlayerAliases
 
@@ -527,7 +529,9 @@ update msg model =
                     { schemaJson = def, url = model.url, state = CannotDecode e |> DefinitionStage }
 
                 Ok d ->
-                    { schemaJson = def, url = model.url, state = CanDecode d |> DefinitionStage }
+                    case (Validation.validateSchema d).errors of
+                        [] -> { schemaJson = def, url = model.url, state = CanDecodeWithoutErrors d |> DefinitionStage }
+                        errors -> { schemaJson = def, url = model.url, state = CanDecodeWithErrors errors |> DefinitionStage }
 
         MoveToEdit ->
             DefinitionStage StartingOut |> toState
@@ -791,7 +795,7 @@ viewLog aliases state log =
           ]
 
 
-viewPlayerSelection : Int -> { minPlayers : Int, maxPlayers : Int } -> TrackerTopLevelSchema -> Html Msg
+viewPlayerSelection : Int -> { pgd | minPlayers : Int, maxPlayers : Int } -> TrackerTopLevelSchema -> Html Msg
 viewPlayerSelection players { minPlayers, maxPlayers } schema =
     div []
         [ h1 [] [ text "Number of players" ]
@@ -811,10 +815,17 @@ viewEditTracker def url valid =
         [ div [] [ h1 [] [ text "Edit Tracker" ] ]
         , div [] [ textarea [ cols 40, rows 10, placeholder "...", onInput UpdateDefinition, value def ] [] ]
         , case valid of
-            CanDecode d ->
+            CanDecodeWithoutErrors d ->
                 div [class "definition-valid"]
                     [ div [] [ text <| "Definition good: " ++ d.name ]
                     , button [ onClick (MoveToPlayerSelection d), class "create-tracker-button" ] [ text "Create!" ]
+                    ]
+
+            CanDecodeWithErrors errs ->
+                div [class "definition-invalid"]
+                    [ text "Definition invalid"
+                    , h2 [] [text "Errors"]
+                    , errs |> List.map (Validation.errorToString >> text >> List.singleton >> li []) |> ul [] 
                     ]
 
             CannotDecode err ->
