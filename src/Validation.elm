@@ -40,6 +40,20 @@ type BadSchemaError
   | PlayerDefaultsOutsidePlayerRange { id : String, defaultIds : List Int, range : PlayerGroupData }
   | MoreAliasesGivenInPlayerGroupThanMaxPlayers
 
+errorKey : BadSchemaError -> String
+errorKey err =
+    case err of
+      TooManyPlayerGroups _ -> "too-many-player-groups"
+      DuplicateIds _ -> "duplicate-ids"
+      PlayerGroupCannotBeInItemList _ -> "player-group-in-list"
+      CannotSetCurrentPlayerToThisOutsideOfPlayerGroup -> "set-current-player-outside-of-group"
+      TurnsDisabledButTriedTo _ -> "tried-action-when-turns-disabled"
+      TriedToReferenceWithoutPlayerGroup _ -> "player-reference-without-group"
+      CannotReferenceThisPlayerOutsideOfPlayerGroup -> "this-player-reference-outside-of-group"
+      MinMustBeLessThanOrEqualToMax _ -> "min-more-than-max"
+      PlayerDefaultsOutsidePlayerRange _ -> "player-default-outside-of-range"
+      MoreAliasesGivenInPlayerGroupThanMaxPlayers -> "more-aliases-given-than-players"
+
 errorToString : BadSchemaError -> String
 errorToString err =
     case err of

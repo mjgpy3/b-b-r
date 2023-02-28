@@ -825,7 +825,9 @@ viewEditTracker def url valid =
                 div [class "definition-invalid"]
                     [ text "Definition invalid"
                     , h2 [] [text "Errors"]
-                    , errs |> List.map (Validation.errorToString >> text >> List.singleton >> li []) |> ul [] 
+                    , errs
+                      |> List.map (\e -> e |> Validation.errorToString |> text |> List.singleton |> li ["error-key-" ++ Validation.errorKey e|> id])
+                      |> ul []
                     ]
 
             CannotDecode err ->

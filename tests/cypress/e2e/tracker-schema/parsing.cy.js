@@ -8,6 +8,13 @@ const assertInvalid = () => {
   cy.get('.definition-invalid').should('exist')
 };
 
+const assertInvalidWith = (selectors) => {
+  cy.get('.definition-valid').should('not.exist')
+  cy.get('.definition-invalid').should('exist')
+  selectors.forEach(selector =>
+    cy.get(selector).should('exist')
+  );
+};
 
 const shell = tracker => ({
   name: "T",
@@ -55,6 +62,76 @@ describe('parsing tracker schemas', () => {
        const withoutTurns = { ...exampleTextField, turns: false };
        cy.get('textarea').type(JSON.stringify(withoutTurns), { parseSpecialCharSequences: false, delay: 0 })
        assertValid();
+    });
+  });
+
+  describe('validations', () => {
+    it('fails when multiple player groups are given', () => {
+      cy.get('textarea').type(JSON.stringify(
+      shell({
+        type: 'player-group',
+        minPlayers: 2,
+        maxPlayers: 2,
+        items: [
+          {
+            type: 'player-group',
+            minPlayers: 2,
+            maxPlayers: 2,
+            items: [
+            ]
+          } 
+        ]
+      })
+      ), { parseSpecialCharSequences: false, delay: 0 });
+      assertInvalidWith(['#error-key-too-many-player-groups']);
+    });
+
+    it('fails when IDs are repeated', () => {
+      cy.get('textarea').type(JSON.stringify(
+        shell({
+          type: 'group',
+          items: [
+            exampleNumberField(s => s).tracker,
+            exampleNumberField(s => s).tracker
+          ]
+        })
+      ), { parseSpecialCharSequences: false, delay: 0 });
+      assertInvalidWith(['#error-key-duplicate-ids']);
+    });
+
+    it('fails when a player group is in an item list', () => {
+      cy.get('textarea').type(JSON.stringify(
+        shell({
+          type: 'item-list',
+          text: 'Items',
+          id: 'items',
+          items: [
+              {
+              type: 'player-group',
+              minPlayers: 1,
+              maxPlayers: 4,
+              items: []
+            }
+          ]
+        })
+      ), { parseSpecialCharSequences: false, delay: 0 });
+      assertInvalidWith(['#error-key-player-group-in-list']);
+    });
+
+    it('fails when an action tries to set the current player outside of a player group', () => {
+      cy.get('textarea').type(JSON.stringify(
+        shell({
+          "type": "action",
+          "text": "Set to this player!",
+          "effects": [
+            {
+              "type": "set-current-player",
+              "target": "this-player"
+            }
+          ]
+        })
+      ), { parseSpecialCharSequences: false, delay: 0 });
+      assertInvalidWith(['#error-key-set-current-player-outside-of-group']);
     });
   });
 
