@@ -1199,7 +1199,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                                 in
                                 div []
                                     [ viewTrackerComponent schema (Group { collapsed = Nothing, items = s.items, text = Nothing }) state turns itemKey aliases
-                                    , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem { key=itemKey, text = s.text }) ] [ text "Remove" ]
+                                    , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem { key=itemKey, text = s.text }), htmlIdFromKey "remove-item" (keyWithId s.id itemKey) ] [ text "Remove" ]
                                     ]
 
                               else

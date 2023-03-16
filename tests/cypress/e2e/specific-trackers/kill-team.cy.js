@@ -8,7 +8,59 @@ describe('kill team tracker', () => {
 
   describe('when tracking', () => {
     describe('when a player adds an operative', () => {
-      
+      beforeEach(() => {
+        cy.get('#player-1-operatives-add-item').click();
+      });
+
+      describe('the operative', () => {
+        it('exists', () => {
+          cy.get('#player-1-item-0-Name-text').should('exist')
+        });
+      });
+
+      describe('when they undo the addition', () => {
+        beforeEach(() => {
+          cy.get('#undo-last-history-entry').click();
+        });
+
+        describe('the operative', () => {
+           it('no longer exists', () => {
+              cy.get('#player-1-item-0-Name-text').should('not.exist')
+           });
+        });
+      });
+
+      describe('and they add wounds to the operative', () => {
+        beforeEach(() => {
+          cy.get('#player-1-item-0-operative-wounds-number input').type('{selectAll}12');
+        });
+
+       describe('when they remove that operative', () => {
+          beforeEach(() => {
+            cy.get('#player-1-item-0-operatives-remove-item').click();
+          });
+
+          describe('the operative', () => {
+            it('no longer exists', () => {
+               cy.get('#player-1-item-0-Name-text').should('not.exist')
+            });
+          });
+
+          describe('when they undo the removal', () => {
+            beforeEach(() => {
+               cy.get('#undo-last-history-entry').click();
+            });
+
+            describe('the operative', () => {
+              it('is back with the correct wounds', () => {
+                cy.get('#player-1-item-0-Name-text').should('exist')
+                cy.get('#player-1-item-0-operative-wounds-number input').should('have.value', 12)
+              });
+            });
+          });
+       });
+
+      });
     });
 
     describe('at the start of the game', () => {
