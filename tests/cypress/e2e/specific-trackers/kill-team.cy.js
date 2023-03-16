@@ -7,6 +7,10 @@ describe('kill team tracker', () => {
   });
 
   describe('when tracking', () => {
+    describe('when a player adds an operative', () => {
+      
+    });
+
     describe('at the start of the game', () => {
       describe('the turning point', () => {
         it("is 1", () => {

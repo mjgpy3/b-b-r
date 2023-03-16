@@ -1185,8 +1185,9 @@ viewTrackerComponent schema tracker state turns key aliases =
         ItemList s ->
             div
                 [ style "border" "1px solid black"
+                , class "item-list"
                 ]
-                [ div [] [ text s.text, button [ onClick (NewListItem { key=key, text=s.text }) ] [ text "+" ] ]
+                [ div [] [ text s.text, button [ onClick (NewListItem { key=key, text=s.text }), htmlIdFromKey "add-item" (keyWithId s.id key) ] [ text "+" ] ]
                 , listItems (keyWithId s.id key) state
                     |> Array.map
                         (\item ->
@@ -1197,7 +1198,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                                         keyWithItemNumber item.index key
                                 in
                                 div []
-                                    [ viewTrackerComponent schema (Group { collapsed = Just False, items = s.items, text = Nothing }) state turns itemKey aliases
+                                    [ viewTrackerComponent schema (Group { collapsed = Nothing, items = s.items, text = Nothing }) state turns itemKey aliases
                                     , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem { key=itemKey, text = s.text }) ] [ text "Remove" ]
                                     ]
 
@@ -1211,26 +1212,21 @@ viewTrackerComponent schema tracker state turns key aliases =
 
         Group s ->
             let
-                collapses =
-                    s.collapsed == Just True
+                collapses = s.collapsed /= Nothing
 
-                header =
-                    case s.text of
-                        Just t ->
-                            b [] [ text t ]
-
-                        Nothing ->
-                            text ""
+                header = s.text |> Maybe.withDefault "" |> text
 
                 group content =
                     div
-                        [ style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem", style "margin-bottom" "1rem" , style "margin-top" "1rem" ]
-                        [ if collapses then
-                            details [] (summary [] [ header ] :: content)
-
-                          else
-                            div [] content
-                        ]
+                        [ style "border" "1px solid black", style "margin-left" "1rem", style "margin-right" "1rem", style "margin-bottom" "1rem" , style "margin-top" "1rem", class "group"]
+                        [ case s.collapsed of
+                            Just True ->
+                              details [Html.Attributes.attribute "open" "true"] (summary [] [ header ] :: content)
+                            Just False ->
+                              details [] (summary [] [ header ] :: content)
+                            Nothing ->
+                              div [] content
+                          ]
             in
             s.items |> List.map (\i -> viewTrackerComponent schema i state turns key aliases) |> group
 
