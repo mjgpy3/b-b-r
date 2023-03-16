@@ -244,100 +244,68 @@ emptyState =
     }
 
 
-resurrectItem : Key k -> TrackingState -> TrackingState
-resurrectItem key state =
+modItem : (ListItem -> ListItem) -> Key k -> TrackingState -> TrackingState
+modItem f key state =
     let
-        resurrectListItem idx mul =
+        mod idx mul =
             case mul of
                 Just m ->
-                    { m | listItems = Array.map (\item -> { item | live = item.live || item.index == idx }) m.listItems }
+                    { m | listItems = Array.map (\item -> if item.index == idx then f item else item) m.listItems }
 
                 Nothing ->
                     emptyMul
     in
     case key of
         NonPlayerKey (KeyUnderList idx _) ->
-            { state | nonPlayer = resurrectListItem idx (Just state.nonPlayer) }
+            { state | nonPlayer = mod idx (Just state.nonPlayer) }
 
         PlayerKey p (KeyUnderList idx _) ->
-            { state | player = Dict.update p (resurrectListItem idx >> Just) state.player }
+            { state | player = Dict.update p (mod idx >> Just) state.player }
 
         NonPlayerKey (KeyNotUnderList _) ->
             state
 
         PlayerKey _ (KeyNotUnderList _) ->
             state
+
+resurrectItem : Key k -> TrackingState -> TrackingState
+resurrectItem = modItem (\item -> { item | live = True })
 
 removeItem : Key k -> TrackingState -> TrackingState
-removeItem key state =
-    let
-        removeListItem idx mul =
-            case mul of
-                Just m ->
-                    { m | listItems = Array.map (\item -> { item | live = item.live && item.index /= idx }) m.listItems }
-
-                Nothing ->
-                    emptyMul
-    in
-    case key of
-        NonPlayerKey (KeyUnderList idx _) ->
-            { state | nonPlayer = removeListItem idx (Just state.nonPlayer) }
-
-        PlayerKey p (KeyUnderList idx _) ->
-            { state | player = Dict.update p (removeListItem idx >> Just) state.player }
-
-        NonPlayerKey (KeyNotUnderList _) ->
-            state
-
-        PlayerKey _ (KeyNotUnderList _) ->
-            state
+removeItem = modItem (\item -> { item | live = False })
 
 deleteLastItem : Key k -> TrackingState -> TrackingState
-deleteLastItem key state =
+deleteLastItem =
+  modItems (Array.slice 0 -1)
+
+modItems : (Array ListItem -> Array ListItem) -> Key k -> TrackingState -> TrackingState
+modItems f key state =
     let
-        deleteListItem mul =
+        mod mul =
             case mul of
                 Just m ->
-                    { m | listItems = Array.slice 0 -1 m.listItems }
+                    { m | listItems = f m.listItems }
 
                 Nothing ->
-                    emptyMul
+                    { emptyMul | listItems = f Array.empty }
     in
     case key of
         NonPlayerKey (KeyUnderList _ _) ->
-            { state | nonPlayer = deleteListItem (Just state.nonPlayer) }
+            { state | nonPlayer = mod (Just state.nonPlayer) }
 
         PlayerKey p (KeyUnderList _ _) ->
-            { state | player = Dict.update p (deleteListItem >> Just) state.player }
+            { state | player = Dict.update p (mod >> Just) state.player }
 
         NonPlayerKey (KeyNotUnderList _) ->
-            { state | nonPlayer = deleteListItem (Just state.nonPlayer) }
+            { state | nonPlayer = mod (Just state.nonPlayer) }
 
         PlayerKey p (KeyNotUnderList _) ->
-            { state | player = Dict.update p (deleteListItem >> Just) state.player }
+            { state | player = Dict.update p (mod >> Just) state.player }
 
 
 addItem : Key k -> TrackingState -> TrackingState
-addItem key state =
-    let
-        addTo items =
-            Array.push { live = True, index = Array.length items, text = "Item " ++ String.fromInt (Array.length items + 1) } Array.empty |> Array.append items
-
-        addListItem mul =
-            case mul of
-                Just m ->
-                    { m | listItems = addTo m.listItems }
-
-                Nothing ->
-                    { emptyMul | listItems = addTo Array.empty }
-    in
-    case key of
-        NonPlayerKey _ ->
-            { state | nonPlayer = addListItem (Just state.nonPlayer) }
-
-        PlayerKey p _ ->
-            { state | player = Dict.update p (addListItem >> Just) state.player }
-
+addItem =
+  modItems (\items -> Array.push { live = True, index = Array.length items, text = "Item " ++ String.fromInt (Array.length items + 1) } items)
 
 set : Key String -> Value -> TrackingState -> TrackingState
 set key value state =

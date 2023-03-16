@@ -7,6 +7,46 @@ describe('kill team tracker', () => {
   });
 
   describe('when tracking', () => {
+    describe('when a player adds a few operatives', () => {
+      beforeEach(() => {
+        [0, 1, 2, 3, 4, 5, 6].forEach(() => {
+          cy.get('#player-1-operatives-add-item').click();
+        });
+      });
+
+      describe('those operatives', () => {
+        it('exist', () => {
+          [0, 1, 2, 3, 4, 5, 6].forEach(i => {
+            cy.get(`#player-1-item-${i}-Name-text`).should('exist')
+          });
+        });
+      });
+
+      describe('when they selectively remove some of those operatives', () => {
+        beforeEach(() => {
+          [2, 4, 5].forEach(i => {
+            cy.get(`#player-1-item-${i}-operatives-remove-item`).click();
+          });
+        });
+
+       describe('the remaining operatives', () => {
+          it('exist', () => {
+            [0, 1, 3, 6].forEach(i => {
+               cy.get(`#player-1-item-${i}-Name-text`).should('exist')
+            });
+          });
+       });
+
+       describe('the removed operatives', () => {
+          it('do not exist', () => {
+              [2, 4, 5].forEach(i => {
+               cy.get(`#player-1-item-${i}-Name-text`).should('not.exist')
+            });
+          });
+       });
+      })
+    });
+
     describe('when a player adds an operative', () => {
       beforeEach(() => {
         cy.get('#player-1-operatives-add-item').click();
