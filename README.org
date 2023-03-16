@@ -4,7 +4,7 @@
 
 Should-be-working examples are current at the bottom of ./src/Main.elm.
 
-* Items [27/38]
+* Items [27/41]
 ** DONE Sum for list items
    CLOSED: [2023-02-25 Sat 14:33]
 ** DONE Sum cross-player
@@ -72,3 +72,6 @@ Should-be-working examples are current at the bottom of ./src/Main.elm.
 ** DONE Text Field 
    CLOSED: [2023-02-25 Sat 10:01]
 ** TODO Preview on edit screen 
+** TODO Query param to skip # player selection 
+** TODO Hint text for item lists (e.g. replace "Item" with "Operative") 
+** TODO Compaction in sub-logs 

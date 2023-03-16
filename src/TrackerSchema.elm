@@ -380,33 +380,36 @@ numericFieldIds schema =
               Nothing -> []
 
 
-idDefault : String -> TrackerSchema -> Maybe Defaults
-idDefault id schema =
+idDefaultAndName : String -> TrackerSchema -> Maybe (Defaults, String)
+idDefaultAndName id schema =
     case schema of
         TextSchema s ->
             Nothing
 
         WholeNumberSchema s ->
             if s.id == id then
-                Just s.default
+                Just (s.default, s.text)
 
             else
                 Nothing
 
         Group s ->
-            List.head <| List.filterMap (idDefault id) s.items
+            List.head <| List.filterMap (idDefaultAndName id) s.items
 
         ItemList s ->
-            List.head <| List.filterMap (idDefault id) s.items
+            List.head <| List.filterMap (idDefaultAndName id) s.items
 
         PlayerGroup s ->
-            List.head <| List.filterMap (idDefault id) s.items
+            List.head <| List.filterMap (idDefaultAndName id) s.items
 
         Action s ->
             Nothing
 
         Calculated _ ->
             Nothing
+
+idDefault : String -> TrackerSchema -> Maybe Defaults
+idDefault id schema = idDefaultAndName id schema |> Maybe.map Tuple.first
 
 
 fieldsById : String -> TrackerSchema -> List TrackerSchema

@@ -81,8 +81,8 @@ type Key v
     = NonPlayerKey (KeyMaybeUnderList v)
     | PlayerKey Int (KeyMaybeUnderList v)
 
-idFromKey : String -> Key String -> Html.Attribute a
-idFromKey context key =
+htmlIdFromKey : String -> Key String -> Html.Attribute a
+htmlIdFromKey context key =
     let
       idify = String.replace " " "-"
       idFromMk mk =
@@ -97,7 +97,6 @@ idFromKey context key =
 emptyKey : Key ()
 emptyKey =
     () |> KeyNotUnderList |> NonPlayerKey
-
 
 keyWithPlayerNumber : Int -> Key a -> Key a
 keyWithPlayerNumber player key =
@@ -380,14 +379,8 @@ type Error
     | UnexpectedError String
 
 
-type alias Field =
-    { id : String, text : String }
-
-
-type Log
-    = GameStarted Turns
-    | ActionPerformed (Key ()) String (List Effect)
-    | ValueUpdated { key : Key String, old : Value, new : Value, field : Field }
+type alias Field a =
+    { key : Key a, text : String }
 
 
 type alias PlayerAliases =
@@ -416,14 +409,22 @@ init : Url -> Model
 init url =
     { schemaJson = "", url = url, state = DefinitionStage StartingOut }
 
+type Log
+    = GameStarted Turns
+    | ActionPerformed (Key ()) String (List Log)
+    | ValueUpdated { old : Value, new : Value, field : Field String }
+    | CurrentPlayerChanged { old : Int, new : Int }
+    | ListItemAdded (Field ())
+    | ListItemRemoved (Field ())
+
 
 type TrackMsg
     = ApplyEffects (Key ()) String (List Effect)
-    | SetWholeNumber Field (Key String) String
+    | SetWholeNumber (Field String) String
     | SetItemText (Key ()) String
     | UpdatePlayerAlias Int String
-    | NewListItem (Key ()) Field
-    | RemoveListItem (Key ())
+    | NewListItem (Field ())
+    | RemoveListItem (Field ())
 
 
 type Msg
@@ -476,7 +477,7 @@ update msg model =
                             newTail =
                                 case tail of
                                     [ ValueUpdated a, ValueUpdated b ] ->
-                                        if a.key == b.key && a.field == b.field then
+                                        if a.field == b.field then
                                             if b.new == a.old then
                                                 []
 
@@ -537,9 +538,9 @@ update msg model =
             DefinitionStage StartingOut |> toState
 
         TrackerMsg schema state turns aliases (ApplyEffects key action effects) ->
-            case List.foldl (applyEffect key) (Ok ( schema, state, turns )) effects of
-                Ok ( sc, st, ts ) ->
-                    log sc st ts (Just <| ActionPerformed key action effects) aliases
+            case List.foldl (applyEffect key schema) (Ok (state, turns, [])) effects of
+                Ok (st, ts, appliedEffects) ->
+                    log schema st ts (Just <| ActionPerformed key action appliedEffects) aliases
 
                 Err e ->
                     BigError model e |> toState
@@ -547,36 +548,36 @@ update msg model =
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
             log schema state turns Nothing (Dict.insert playerNumber newAlias aliases)
 
-        TrackerMsg _ _ _ _ (SetWholeNumber _ _ "") ->
+        TrackerMsg _ _ _ _ (SetWholeNumber _ "") ->
             model
 
         TrackerMsg schema state turns aliases (SetItemText key text) ->
             log schema (setItemText key text state) turns Nothing aliases
 
-        TrackerMsg schema state turns aliases (NewListItem key field) ->
-            log schema (addItem key state) turns Nothing aliases
+        TrackerMsg schema state turns aliases (NewListItem field) ->
+            log schema (addItem field.key state) turns (ListItemAdded field |> Just) aliases
 
-        TrackerMsg schema state turns aliases (RemoveListItem key) ->
-            log schema (removeItem key state) turns Nothing aliases
+        TrackerMsg schema state turns aliases (RemoveListItem field) ->
+            log schema (removeItem field.key state) turns (ListItemRemoved field |> Just) aliases
 
-        TrackerMsg schema state turns aliases (SetWholeNumber field key rawValue) ->
+        TrackerMsg schema state turns aliases (SetWholeNumber field rawValue) ->
             case String.toInt rawValue of
                 Just v ->
                     let
                         num =
                             WholeNumber v
                     in
-                    case get key ( state, schema ) of
+                    case get field.key ( state, schema ) of
                         Ok oldValue ->
                             let
                                 event =
-                                    ValueUpdated { key = key, old = oldValue, new = num, field = field }
+                                    ValueUpdated { old = oldValue, new = num, field = field }
                             in
                             if oldValue == num then
                                 model
 
                             else
-                                log schema (set key num state) turns (Just <| event) aliases
+                                log schema (set field.key num state) turns (Just <| event) aliases
 
                         Err e ->
                             e |> UnexpectedError |> BigError model |> toState
@@ -607,22 +608,25 @@ update msg model =
                 _ ->
                     BigError model CouldNotReadNumberOfPlayers |> toState
 
-
-applyEffect : Key a -> Effect -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns ) -> Result Error ( TrackerTopLevelSchema, TrackingState, Turns )
-applyEffect key eff result =
+applyEffect : Key a -> TrackerTopLevelSchema -> Effect -> Result Error (TrackingState, Turns, List Log) -> Result Error (TrackingState, Turns, List Log)
+applyEffect key schema eff result =
     case result of
         Err e ->
             Err e
 
-        Ok ( schema, state, turns ) ->
+        Ok ( state, turns, logs ) ->
+            let
+                setCurrentPlayer player =
+                  Ok ( state, { turns | currentPlayerTurn = player }, logs ++ [CurrentPlayerChanged { old = turns.currentPlayerTurn, new = player}] )
+            in
             case eff of
                 NextTurn ->
-                    Ok ( schema, state, { turns | currentPlayerTurn = modBy turns.playerCount (turns.currentPlayerTurn + 1) } )
+                    modBy turns.playerCount (turns.currentPlayerTurn + 1) |> setCurrentPlayer
 
                 SetCurrentPlayer CurrentIsThisPlayer ->
                     case key of
                         PlayerKey player _ ->
-                            Ok ( schema, state, { turns | currentPlayerTurn = player } )
+                            setCurrentPlayer player
 
                         _ ->
                             Err CannotSetCurrentPlayerToThisWithEffectsOutsideContext
@@ -654,9 +658,10 @@ applyEffect key eff result =
                                         NonPlayerKey _ ->
                                             []
                     in
-                    case idDefault targetId schema.tracker of
-                        Just default ->
+                    case idDefaultAndName targetId schema.tracker of
+                        Just (default, name) ->
                             let
+                                field k = { key=k, text=name }
                                 newValue k currentValue =
                                     case ( op, currentValue ) of
                                         ( RestoreDefault, _ ) ->
@@ -677,13 +682,18 @@ applyEffect key eff result =
                                 apply k res =
                                     res
                                         |> Result.andThen
-                                            (\( sc, st, tu ) ->
+                                            (\( st, tu, ls ) ->
                                                 get k ( st, schema )
                                                     |> Result.mapError UnexpectedError
-                                                    |> Result.map (\currentValue -> ( sc, set k (newValue k currentValue) st, tu ))
+                                                    |> Result.map (\currentValue ->
+                                                                       let
+                                                                           new = newValue k currentValue
+                                                                       in
+                                                                           (set k new st, tu, ls ++ [ValueUpdated { field=field k, old=currentValue, new=new}])
+                                                                  )
                                             )
                             in
-                            List.foldl apply (Ok ( schema, state, turns )) keys
+                            List.foldl apply (Ok (state, turns, logs)) keys
 
                         Nothing ->
                             Err <| ComponentIdNotFound scope targetId
@@ -756,12 +766,12 @@ view model =
 
 viewLogs : List Log -> TrackingState -> PlayerAliases -> Html Msg
 viewLogs entries state aliases =
-    div [] (h1 [] [ text "History" ] :: List.map (viewLog aliases state) entries)
+    div [] [ h1 [] [ text "History" ], List.map (viewLog aliases state) entries |> ul [] ]
 
 
 viewLog : PlayerAliases -> TrackingState -> Log -> Html Msg
 viewLog aliases state log =
-    div []
+    li []
         [ case log of
             GameStarted turns ->
                 if turns.playerCount > 1 && not turns.disabled then
@@ -771,22 +781,61 @@ viewLog aliases state log =
                     text "Game started"
 
                 else
-                    text ""
+                    text "Start"
 
-            ActionPerformed (PlayerKey player _) action _ ->
+            ActionPerformed (PlayerKey player _) action [] ->
                 text (playerName player aliases ++ " " ++ action)
 
-            ActionPerformed (NonPlayerKey _) action _ ->
+            ActionPerformed (PlayerKey player _) action logs ->
+                details []
+                    [ summary [] [text (playerName player aliases ++ " " ++ action) ], logs |> List.map (viewLog aliases state) |> ul [] ]
+
+            ActionPerformed (NonPlayerKey _) action [] ->
                 text action
+
+            ActionPerformed (NonPlayerKey _) action logs ->
+                details []
+                    [ summary [] [text action ], logs |> List.map (viewLog aliases state) |> ul [] ]
+
+            CurrentPlayerChanged {old,new} ->
+                "Active player changed from " ++ playerName old aliases ++ " to " ++ playerName new aliases |> text
+
+            ListItemAdded field ->
+                let
+                    itemSegment =
+                      case getItemText field.key state of
+                          Just t -> ", " ++ t
+                          Nothing -> ""
+                in
+                  case field.key of
+                      NonPlayerKey _ ->
+                          text (field.text ++ itemSegment ++ " added")
+
+                      PlayerKey player _ ->
+                          text (playerName player aliases ++ itemSegment ++ " " ++ field.text ++ " added")
+
+            ListItemRemoved field ->
+                let
+                    itemSegment =
+                      case getItemText field.key state of
+                          Just t -> ", " ++ t
+                          Nothing -> ""
+                in
+                  case field.key of
+                      NonPlayerKey _ ->
+                          text (field.text ++ itemSegment ++ " removed")
+
+                      PlayerKey player _ ->
+                          text (playerName player aliases ++ itemSegment ++ " " ++ field.text ++ " removed")
 
             ValueUpdated s ->
                 let
                     itemSegment =
-                      case getItemText s.key state of
+                      case getItemText s.field.key state of
                           Just t -> ", " ++ t
                           Nothing -> ""
                 in
-                  case s.key of
+                  case s.field.key of
                       NonPlayerKey _ ->
                           text (s.field.text ++ itemSegment ++ " updated from " ++ valueToString s.old ++ " to " ++ valueToString s.new)
 
@@ -973,7 +1022,7 @@ viewTrackerComponent : TrackerTopLevelSchema -> TrackerSchema -> TrackingState -
 viewTrackerComponent schema tracker state turns key aliases =
     case tracker of
         TextSchema s ->
-            div [ key |> keyWithId s.text |> idFromKey "text" ]
+            div [ key |> keyWithId s.text |> htmlIdFromKey "text" ]
                 [ text s.text
                 , text " "
                 , case getItemText key state of
@@ -993,7 +1042,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                     v =
                         valueToString <| Result.withDefault (lookupDefault s.default key) (get numberKey ( state, schema ))
                 in
-                div [ class "number-field", numberKey |> idFromKey "number"  ]
+                div [ class "number-field", numberKey |> htmlIdFromKey "number"  ]
                     [ text s.text
                     , text " "
                     , if s.disabled then
@@ -1006,7 +1055,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                           input
                             (
                               [ type_ "number"
-                              , onInput (SetWholeNumber { id = s.id, text = s.text } numberKey)
+                              , onInput (SetWholeNumber { key = numberKey, text = s.text })
                               , value v
                               ]
                               ++ limitAttr s.min Html.Attributes.min
@@ -1016,7 +1065,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                     ]
 
         Calculated s ->
-            div [ class "calculated-field", class "number-field", key |> keyWithId (Maybe.withDefault s.text s.id) |> idFromKey "calculated" ]
+            div [ class "calculated-field", class "number-field", key |> keyWithId (Maybe.withDefault s.text s.id) |> htmlIdFromKey "calculated" ]
                 [ text s.text
                 , text " "
                 , case eval schema turns s.equals key state turns.currentPlayerTurn of
@@ -1035,7 +1084,7 @@ viewTrackerComponent schema tracker state turns key aliases =
             div
                 [ style "border" "1px solid black"
                 ]
-                [ div [] [ text s.text, button [ onClick (NewListItem key { id = s.id, text = s.text }) ] [ text "+" ] ]
+                [ div [] [ text s.text, button [ onClick (NewListItem { key=key, text=s.text }) ] [ text "+" ] ]
                 , listItems (keyWithId s.id key) state
                     |> Array.map
                         (\item ->
@@ -1047,7 +1096,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                                 in
                                 div []
                                     [ viewTrackerComponent schema (Group { collapsed = Just False, items = s.items, text = Nothing }) state turns itemKey aliases
-                                    , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem itemKey) ] [ text "Remove" ]
+                                    , button [ style "margin" "1rem", style "margin-top" "0", onClick (RemoveListItem { key=itemKey, text = s.text }) ] [ text "Remove" ]
                                     ]
 
                               else
@@ -1100,7 +1149,7 @@ viewTrackerComponent schema tracker state turns key aliases =
                 |> div []
 
         Action s ->
-            button [ onClick (ApplyEffects key s.text s.effects), key |> keyWithId s.text |> idFromKey "action" ] [ text s.text ]
+            button [ onClick (ApplyEffects key s.text s.effects), key |> keyWithId s.text |> htmlIdFromKey "action" ] [ text s.text ]
 
 
 playerName : Int -> PlayerAliases -> String
