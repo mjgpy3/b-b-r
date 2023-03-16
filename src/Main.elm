@@ -897,7 +897,7 @@ viewLog aliases state log =
 
             ActionPerformed (NonPlayerKey _) action logs ->
                 details []
-                    [ summary [] [text action ], logs |> List.map (viewLog aliases state) |> ul [] ]
+                    [ summary [] [text action], logs |> List.map (viewLog aliases state) |> ul [] ]
 
             CurrentPlayerChanged {old,new} ->
                 "Active player changed from " ++ playerName old aliases ++ " to " ++ playerName new aliases |> text
@@ -1217,10 +1217,10 @@ viewTrackerComponent schema tracker state turns key aliases =
                 header =
                     case s.text of
                         Just t ->
-                            div [] [ b [] [ text t ] ]
+                            b [] [ text t ]
 
                         Nothing ->
-                            div [] []
+                            text ""
 
                 group content =
                     div
