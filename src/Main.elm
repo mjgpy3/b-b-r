@@ -275,8 +275,7 @@ removeItem : Key k -> TrackingState -> TrackingState
 removeItem = modItem (\item -> { item | live = False })
 
 deleteLastItem : Key k -> TrackingState -> TrackingState
-deleteLastItem =
-  modItems (Array.slice 0 -1)
+deleteLastItem = modItems (Array.slice 0 -1)
 
 modItems : (Array ListItem -> Array ListItem) -> Key k -> TrackingState -> TrackingState
 modItems f key state =

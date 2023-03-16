@@ -285,7 +285,8 @@ describe('parsing tracker schemas', () => {
       'simple-dominion-tracker.json',
     ].forEach(example =>
       it(`parses the example ${example}`, () => {
-        cy.get('textarea').type(JSON.stringify(require(`../../../../examples/${example}`)), { parseSpecialCharSequences: false, delay: 0 });
+        const trackerEncoding = encodeURIComponent(btoa(JSON.stringify(require(`../../../../examples/${example}`))));
+        cy.visit(`http://localhost:8000/src/Main.elm?edit=${trackerEncoding}`);
         assertValid();
       })
     )
