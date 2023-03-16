@@ -244,6 +244,30 @@ emptyState =
     }
 
 
+resurrectItem : Key k -> TrackingState -> TrackingState
+resurrectItem key state =
+    let
+        resurrectListItem idx mul =
+            case mul of
+                Just m ->
+                    { m | listItems = Array.map (\item -> { item | live = item.live || item.index == idx }) m.listItems }
+
+                Nothing ->
+                    emptyMul
+    in
+    case key of
+        NonPlayerKey (KeyUnderList idx _) ->
+            { state | nonPlayer = resurrectListItem idx (Just state.nonPlayer) }
+
+        PlayerKey p (KeyUnderList idx _) ->
+            { state | player = Dict.update p (resurrectListItem idx >> Just) state.player }
+
+        NonPlayerKey (KeyNotUnderList _) ->
+            state
+
+        PlayerKey _ (KeyNotUnderList _) ->
+            state
+
 removeItem : Key k -> TrackingState -> TrackingState
 removeItem key state =
     let
@@ -267,6 +291,30 @@ removeItem key state =
 
         PlayerKey _ (KeyNotUnderList _) ->
             state
+
+deleteLastItem : Key k -> TrackingState -> TrackingState
+deleteLastItem key state =
+    let
+        deleteListItem mul =
+            case mul of
+                Just m ->
+                    { m | listItems = Array.slice 0 -1 m.listItems }
+
+                Nothing ->
+                    emptyMul
+    in
+    case key of
+        NonPlayerKey (KeyUnderList _ _) ->
+            { state | nonPlayer = deleteListItem (Just state.nonPlayer) }
+
+        PlayerKey p (KeyUnderList _ _) ->
+            { state | player = Dict.update p (deleteListItem >> Just) state.player }
+
+        NonPlayerKey (KeyNotUnderList _) ->
+            { state | nonPlayer = deleteListItem (Just state.nonPlayer) }
+
+        PlayerKey p (KeyNotUnderList _) ->
+            { state | player = Dict.update p (deleteListItem >> Just) state.player }
 
 
 addItem : Key k -> TrackingState -> TrackingState
@@ -417,7 +465,6 @@ type Log
     | ListItemAdded (Field ())
     | ListItemRemoved (Field ())
 
-
 type TrackMsg
     = ApplyEffects (Key ()) String (List Effect)
     | SetWholeNumber (Field String) String
@@ -425,7 +472,8 @@ type TrackMsg
     | UpdatePlayerAlias Int String
     | NewListItem (Field ())
     | RemoveListItem (Field ())
-
+    | UndoLastLog
+    | Undo Log
 
 type Msg
     = UpdateDefinition String
@@ -444,7 +492,23 @@ update msg model =
         toState state =
             { schemaJson = model.schemaJson, url = model.url, state = state }
 
-        log schema state players newLog aliases =
+        unlog schema state turns aliases =
+            let
+                (finalLog, newLogs) =
+                    case model.state of
+                        TrackerStage _ _ _ logs _ ->
+                            let
+                              dropped = List.take (List.length logs - 1) logs
+                            in 
+                              case List.drop (List.length logs - 1) logs of
+                                 [l] -> (Just l, dropped)
+                                 _ -> (Nothing, dropped)
+                        _ -> (Nothing, [] )
+
+            in
+                (finalLog, TrackerStage schema state turns newLogs aliases |> toState )
+
+        log schema state turns newLog aliases =
             let
                 oldLogs =
                     case model.state of
@@ -492,7 +556,7 @@ update msg model =
                         in
                         head ++ newTail
             in
-            TrackerStage schema state players compacted aliases |> toState
+            TrackerStage schema state turns compacted aliases |> toState
     in
     case msg of
         MoveTo m ->
@@ -547,6 +611,33 @@ update msg model =
 
         TrackerMsg schema state turns aliases (UpdatePlayerAlias playerNumber newAlias) ->
             log schema state turns Nothing (Dict.insert playerNumber newAlias aliases)
+
+        TrackerMsg schema state turns aliases (Undo entry) ->
+            let
+                undo l (st, ts) =
+                  case l of
+                    GameStarted _ ->
+                        (st, ts)
+                    ActionPerformed k a logs ->
+                        logs
+                            |> List.reverse
+                            |> List.foldl undo (st, ts)
+                    ValueUpdated { old, field } ->
+                        (set field.key old st, ts)
+                    CurrentPlayerChanged { old } ->
+                        (st, { ts | currentPlayerTurn = old })
+                    ListItemAdded {key} ->
+                        (deleteLastItem key st, ts)
+                    ListItemRemoved {key} ->
+                        (resurrectItem key st, ts)
+            in
+              case undo entry (state, turns) of
+                 (st, ts) -> log schema st ts Nothing aliases
+
+        TrackerMsg schema state turns aliases UndoLastLog ->
+            case unlog schema state turns aliases of
+                (Nothing, m) -> m
+                (Just l, m) -> update (TrackerMsg schema state turns aliases (Undo l)) m
 
         TrackerMsg _ _ _ _ (SetWholeNumber _ "") ->
             model
@@ -727,7 +818,7 @@ view model =
         TrackerStage def state turns log aliases ->
             div []
                 [ viewTracker def state turns aliases
-                , viewLogs log state aliases
+                , viewLogs log state aliases |> Html.map (TrackerMsg def state turns aliases)
                 , div [] [ makeUrl "track" model.schemaJson model.url ]
                 , div [] [ makeUrl "edit" model.schemaJson model.url ]
                 ]
@@ -764,12 +855,23 @@ view model =
                 ]
 
 
-viewLogs : List Log -> TrackingState -> PlayerAliases -> Html Msg
+viewLogs : List Log -> TrackingState -> PlayerAliases -> Html TrackMsg
 viewLogs entries state aliases =
-    div [] [ h1 [] [ text "History" ], List.map (viewLog aliases state) entries |> ul [] ]
+    let
+        disabled =
+            case entries of
+                [] -> True
+                [GameStarted _] -> True
+                _ -> False
+    in
+    div []
+        [ h1 [] [ text "History" ]
+        , button [ onClick UndoLastLog, Html.Attributes.disabled disabled, id "undo-last-history-entry" ] [ text "Undo" ]
+        , List.map (viewLog aliases state) entries |> ul []
+        ]
 
 
-viewLog : PlayerAliases -> TrackingState -> Log -> Html Msg
+viewLog : PlayerAliases -> TrackingState -> Log -> Html a
 viewLog aliases state log =
     li []
         [ case log of
