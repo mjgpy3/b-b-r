@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder, field, int, map, map4, string)
 import Maybe exposing (Maybe)
 import String exposing (String)
+import Set exposing (Set)
 
 cellScopeDecoder : Maybe String -> Decoder CellScope
 cellScopeDecoder scope =
@@ -378,6 +379,43 @@ numericFieldIds schema =
             case s.id of
               Just id -> [(id, Calculated s)]
               Nothing -> []
+
+targetIds : TrackerSchema -> List String
+targetIds schema =
+    let
+        effectTargetIds eff =
+            case eff of
+              OnCells _ targetId _ -> [targetId]
+              NextTurn -> []
+              SetCurrentPlayer _ -> []
+
+        expressionTargetIds eff =
+            case eff of
+              Op _ exprs -> List.concatMap expressionTargetIds exprs
+              Ref targetId _ -> [targetId]
+              Literal _ -> []
+    in
+    case schema of
+        TextSchema s ->
+            []
+
+        WholeNumberSchema s ->
+            []
+
+        Group s ->
+            List.concatMap targetIds s.items
+
+        ItemList s ->
+            List.concatMap targetIds s.items
+
+        PlayerGroup s ->
+            List.concatMap targetIds s.items
+
+        Action s ->
+            List.concatMap effectTargetIds s.effects
+
+        Calculated s ->
+            expressionTargetIds s.equals
 
 
 idDefaultAndName : String -> TrackerSchema -> Maybe (Defaults, String)

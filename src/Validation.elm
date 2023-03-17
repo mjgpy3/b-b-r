@@ -2,6 +2,7 @@ module Validation exposing (..)
 
 import TrackerSchema exposing (..)
 import Dict exposing (Dict)
+import Set exposing (Set)
 
 type alias Results e w a = {
   errors : List e
@@ -31,6 +32,7 @@ merge a b =
 type BadSchemaError
   = TooManyPlayerGroups { count : Int }
   | DuplicateIds { ids : List String }
+  | IdsAreTargetedButNotFound { ids : List String }
   | PlayerGroupCannotBeInItemList { itemListId: String }
   | CannotSetCurrentPlayerToThisOutsideOfPlayerGroup
   | TurnsDisabledButTriedTo {attempted : String }
@@ -45,6 +47,7 @@ errorKey err =
     case err of
       TooManyPlayerGroups _ -> "too-many-player-groups"
       DuplicateIds _ -> "duplicate-ids"
+      IdsAreTargetedButNotFound _ -> "targeted-ids-are-not-found"
       PlayerGroupCannotBeInItemList _ -> "player-group-in-list"
       CannotSetCurrentPlayerToThisOutsideOfPlayerGroup -> "set-current-player-outside-of-group"
       TurnsDisabledButTriedTo _ -> "tried-action-when-turns-disabled"
@@ -62,6 +65,10 @@ errorToString err =
           case ids of
               [id] -> "The following ID is duplicated: " ++ id
               is -> "The following IDs are duplicated: " ++ String.join ", " is
+      IdsAreTargetedButNotFound { ids } ->
+          case ids of
+              [id] -> "The following ID is a target but not found in the definition: " ++ id
+              is -> "The following IDs are targets but not found in the definition: " ++ String.join ", " is
       PlayerGroupCannotBeInItemList { itemListId } ->
           "A player group cannot be nested in item list: " ++ itemListId
       CannotSetCurrentPlayerToThisOutsideOfPlayerGroup ->
@@ -107,22 +114,24 @@ ensureOnePlayerGroup schema =
     (( pgd, _ )::_) -> pgd |> Just |> ok
     _ -> ok Nothing
 
-ensureNoDupliateIds : TrackerTopLevelSchema -> ValidationResult ()
+ensureNoDupliateIds : TrackerTopLevelSchema -> ValidationResult (Set String)
 ensureNoDupliateIds schema =
   let
       count k counts =
           Dict.update k (Maybe.withDefault 0 >> (+) 1 >> Just) counts
-      dupes =
+      ids =
           schema.tracker
               |> numericFieldIds
               |> List.map Tuple.first
+      dupes =
+          ids
               |> List.foldl count Dict.empty
               |> Dict.filter (\_ v -> v > 1)
               |> Dict.keys
   in
       case dupes of
-          [] -> ok ()
-          _ -> { ids = dupes } |> DuplicateIds  |> fail
+          [] -> ok (Set.fromList ids)
+          _ -> { ids = dupes } |> DuplicateIds |> failWith (Set.fromList ids)
 
 ensureNoPlayerGroupInAnItemList : TrackerTopLevelSchema -> ValidationResult ()
 ensureNoPlayerGroupInAnItemList schema =
@@ -294,8 +303,21 @@ validateSchema schema =
           in
             ensureIdScopeReferencesMakeSense { playerGroupExists = maybePg /= Nothing, itemListExists = itemList } schema
       groupsAndRefs = ensureOnePlayerGroup schema |> andThen ensureRefs
+      ensureIds = ensureNoDupliateIds schema
+      ensureTargetsHitRealIds =
+          case ensureIds.result of
+              Nothing -> ok ()
+              Just actuals ->
+                  let
+                      targets = Set.fromList (targetIds schema.tracker)
+                      inTargetButNotActual = Set.diff targets actuals
+                  in
+                      if Set.isEmpty inTargetButNotActual
+                      then ok ()
+                      else { ids = Set.toList inTargetButNotActual } |> IdsAreTargetedButNotFound |> fail
   in
       groupsAndRefs
-          |> merge (ensureNoDupliateIds schema)
+          |> merge ensureIds
+          |> merge ensureTargetsHitRealIds
           |> merge (ensureNoPlayerGroupInAnItemList schema)
           |> merge (ensureRanges schema)

@@ -99,6 +99,37 @@ describe('parsing tracker schemas', () => {
       assertInvalidWith(['#error-key-duplicate-ids']);
     });
 
+    it('fails when IDs that do not exist are targeted', () => {
+      cy.get('textarea').type(JSON.stringify(
+        {
+          "name": "Errors when click",
+          "tracker": {
+             "type": "group",
+             "items": [
+                {
+                  "type": "number",
+                  "text": "V",
+                  "default": 42,
+                  "id": "99"
+                },
+                {
+                  "type": "action",
+                  "text": "Break!",
+                  "effects": [
+                     {
+                        "type": "adjust",
+                        "amount": 1,
+                        "targetId": "does-not-exit"
+                     }
+                  ]
+                }
+             ]
+          }
+        }
+      ), { parseSpecialCharSequences: false, delay: 0 });
+      assertInvalidWith(['#error-key-targeted-ids-are-not-found']);
+    });
+
     it('fails when a player group is in an item list', () => {
       cy.get('textarea').type(JSON.stringify(
         shell({
@@ -164,7 +195,20 @@ describe('parsing tracker schemas', () => {
             type: 'player-group',
             minPlayers: 2,
             maxPlayers: 4,
-            items: [ {
+            items: [
+            {
+              type: "number",
+              text: "A",
+              id: "some-field",
+              default: 0
+            },
+            {
+              type: "number",
+              text: "B",
+              id: "another-field",
+              default: 0
+            },
+            {
               type: "action",
               text: "A",
               effects: [
@@ -251,6 +295,12 @@ describe('parsing tracker schemas', () => {
             maxPlayers: 2,
             items: [
               {
+                 type: "number",
+                 text: 'hi',
+                 id: 'target',
+                 default: 0
+              },
+              {
                 type: "calculated",
                 text: ':)',
                 id: 'some-id',
@@ -279,7 +329,6 @@ describe('parsing tracker schemas', () => {
       'defaults-support-floats.json',
       'hidden-fields.json',
       'kill-team-tracker.json',
-      'known-error.json',
       'money.json',
       'per-player-defaults.json',
       'simple-dominion-tracker.json',
